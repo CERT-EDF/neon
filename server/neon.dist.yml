@@ -1,0 +1,97 @@
+# ------------------------------------------------------------------------------
+# neon server configuration
+server:
+  host: 127.0.0.1
+  port: 8080
+  client_max_size: 104857600 # 100 MB
+# ------------------------------------------------------------------------------
+# neon storage configuration
+storage:
+  directory: /data/neon/storage
+  temporary: /data/neon/temp
+# ------------------------------------------------------------------------------
+# neon analyzer configuration
+analyzer:
+  directory: /data/neon/analyzer
+# ------------------------------------------------------------------------------
+# fusion auth api configuration
+auth_api:
+  backend:
+    strategy: basic
+    basic:
+      groups: []
+      users:
+        - username: test
+          digest: argon2-digest-goes-here
+          groups:
+            - DFIR
+    keycloak:
+      url: https://keycloak.domain.lan
+      client_id: neon
+      realm_name: master
+      client_secret: replace-me-with-a-secret
+      redirect_uri: https://neon.domain.lan/login
+      include_auth: true
+      verify: true
+  clients: []
+  iron_key: null
+# ------------------------------------------------------------------------------
+# fusion case api configuration
+case_api: {}
+# ------------------------------------------------------------------------------
+# fusion info api configuration
+info_api:
+  auth_required: false
+# ------------------------------------------------------------------------------
+# fusion event api configuration
+event_api:
+  webhook: https://n8n.domain.lan/webhook/neon
+  api_key: api-key-placeholder
+  api_ssl: true
+  timeout: 5
+# ------------------------------------------------------------------------------
+# fusion constant api configuration
+constant_api:
+  auth_required: true
+  constant_path: constant.yml
+# ------------------------------------------------------------------------------
+# fusion download api configuration
+download_api:
+  max_pending_download: 25
+# ------------------------------------------------------------------------------
+# synchronizer configuration
+synchronizer:
+  directory: /syncfs
+# ------------------------------------------------------------------------------
+# analyzer configuration
+analyzer:
+  # ------------------------------------------------------------------------------
+  # capa configuration
+  capa:
+    enabled: false
+    workers: 1
+    program: /analyzer/capa/capa
+    rules_dir: /analyzer/capa/rules
+  # ------------------------------------------------------------------------------
+  # content type configuration
+  content_type:
+    enabled: false
+    workers: 1
+    program_ent: /analyzer/ct/ent
+    program_file: /analyzer/ct/file
+    program_magika: /analyzer/ct/magika
+  # ------------------------------------------------------------------------------
+  # floss configuration
+  floss:
+    enabled: false
+    workers: 1
+    program: /analyzer/floss/floss
+  # ------------------------------------------------------------------------------
+  # yara configuration
+  yara:
+    enabled: false
+    workers: 1
+    program: /analyzer/yara/yara
+    compiled: false
+    rule_files:
+      - /analyzer/yara/rules/index.yar

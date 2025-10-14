@@ -1,0 +1,17 @@
+banner: null
+allow_empty_acs: true
+tags:
+  - windows
+  - android
+  - linux
+  - ios
+  - apk
+  - elf
+  - pe
+  - darwin
+  - script
+globs:
+  - glob: cybereason-*
+    secret: placeholder
+  - glob: microsoft-*
+    secret: placeholder

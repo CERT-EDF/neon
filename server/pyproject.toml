@@ -1,0 +1,61 @@
+[project]
+name = "edf-neon-server"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+keywords = ["edf", "neon", "server"]
+description = "EDF Neon Server"
+requires-python = ">=3.12"
+dynamic = ["version"]
+authors = [
+  { name="CERT-EDF", email="cert@edf.fr" },
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Topic :: Utilities",
+    "Topic :: Security",
+]
+dependencies = [
+    "edf-neon-core~=1.0",
+    "pyzipper~=0.3",
+]
+
+
+[project.scripts]
+neon-server = "edf_neon_server.main:app"
+neon-synchronizer = "edf_neon_server.synchronizer:app"
+
+
+[project.urls]
+"Homepage" = "https://github.com/cert-edf/neon"
+"Repository" = "https://github.com/cert-edf/neon"
+"Bug Tracker" = "https://github.com/cert-edf/neon/issues"
+
+
+[build-system]
+requires = ["setuptools>=78", "setuptools_scm>=8.2", "wheel"]
+build-backend = "setuptools.build_meta"
+
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["edf_neon_server", "edf_neon_server.*"]
+
+
+[tool.setuptools_scm]
+root = ".."
+version_file = "edf_neon_server/__version__.py"
+
+
+[tool.black]
+line-length = 79
+skip-string-normalization = true
+
+
+[tool.isort]
+profile = "black"
+line_length = 79
