@@ -1,0 +1,16 @@
+@if (file) {
+<section class="w-full mx-auto">
+  <span>You are uploading <i>{{ file.name }}</i> ({{ file.size | fileSize }})</span>
+
+  <div pFocusTrap class="mt-4">
+    <p-floatlabel variant="in" class="w-full">
+      <input id="secret" [formControl]="secretInput" pInputText class="w-full" (keyup.enter)="closeDialog()" />
+      <label for="secret">Secret</label>
+    </p-floatlabel>
+
+    <div class="mt-4 text-right">
+      <p-button (click)="closeDialog()" text [disabled]="!secretInput.value" label="Upload" />
+    </div>
+  </div>
+</section>
+}

@@ -1,0 +1,45 @@
+<section>
+  @if (isManaged) {
+  <div class="mx-4 bg-red-100 border-l-3 border-red-500 text-red-700 flex justify-between items-center p-4">
+    <div class="flex flex-col">
+      <p class="font-bold">Managed Case</p>
+      <p>Case is currently managed by Iron.</p>
+    </div>
+    <p-button [disabled]="this.caseForm.enabled" text (click)="enableCaseForm()" label="Unlock" icon="pi pi-lock-open" />
+  </div>
+  }
+
+  <div pFocusTrap class="grid grid-cols-2 gap-4 p-4" [formGroup]="caseForm">
+    <p-floatlabel variant="in" class="w-full">
+      <input id="name" formControlName="name" pInputText fluid />
+      <label for="name">Name</label>
+    </p-floatlabel>
+
+    <p-floatlabel variant="in" class="w-full">
+      <input id="tsid" formControlName="tsid" pInputText fluid />
+      <label for="tsid">TSID</label>
+    </p-floatlabel>
+
+    <p-floatlabel variant="in" class="col-span-full w-full">
+      <p-multiselect [options]="acsGroups" [group]="true" [showToggleAll]="false" formControlName="acs" appendTo="body"
+      scrollHeight="250px" display="chip" id="acs" optionLabel="label" optionValue="value" fluid>
+        <ng-template let-group #group>
+            <div class="flex items-center">
+                <img class="mr-2 w-5" />
+                <span>{{ group.label }}</span>
+            </div>
+        </ng-template>
+      </p-multiselect>
+      <label for="acs">acs</label>
+    </p-floatlabel>
+
+    <p-floatlabel variant="in" class="col-span-full w-full">
+      <textarea id="description" formControlName="description" pTextarea fluid></textarea>
+      <label for="description">Description</label>
+    </p-floatlabel>
+  </div>
+
+  <div class="mt-4 text-right">
+    <p-button (click)="closeDialog()" text [disabled]="!caseForm.valid" [label]="caseForm.get('guid')?.value ? 'Update' : 'Create'" />
+  </div>
+</section>

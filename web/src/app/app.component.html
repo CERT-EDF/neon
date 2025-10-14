@@ -1,0 +1,10 @@
+@if (banner) {
+<div class="fixed top-0 left-0 h-10 flex items-center w-full p-1 bg-surface-800 z-50">
+    <div class="flex items-center mx-auto truncate tracking-wide text-white dark:text-gray-200">{{ banner }}</div>
+    <div class="absolute right-2"><p-button size="small" severity="success" text icon="pi pi-times" (click)="ackBanner()"/></div>
+</div>
+}
+
+<router-outlet></router-outlet>
+
+<p-toast [preventOpenDuplicates]="true" />

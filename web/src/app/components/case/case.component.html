@@ -1,0 +1,521 @@
+<section class="max-w-7xl mx-auto px-4 m-4 mb-8 slide-y">
+  <div class="my-8 flex items-center justify-between mx-auto">
+    <img class="h-20 cursor-pointer" src="favicon.png" [routerLink]="'/'" />
+  </div>
+
+  <div [formGroup]="caseForm">
+    <div class="flex items-center justify-between">
+      <div class="flex flex-col">
+        @defer () {
+        <span class="shrink text-sm text-slate-300" pTooltip="Click to copy"
+          [cdkCopyToClipboard]="caseMeta?.tsid || ''">#{{ caseMeta!.tsid || 'N/A' }}</span>
+        <h1 class="text-xl font-medium text-slate-700 dark:text-slate-200 md:text-3xl" pTooltip="Click to copy"
+          [cdkCopyToClipboard]="caseMeta?.name || ''">{{ caseMeta!.name }}</h1>
+        <span class="mt-1 text-sm text-slate-500">{{ caseMeta!.description || 'No description' }}</span>
+        } @placeholder (minimum 0.4s) {
+        <p-skeleton height="1rem" width="200px"></p-skeleton>
+        <div class="mt-1"><p-skeleton height="2rem" width="400px"></p-skeleton></div>
+        }
+      </div>
+      <p-button icon="pi pi-ellipsis-h" (click)="constructCaseMenu($event)" severity="secondary" text />
+    </div>
+
+    <p-card styleClass="mt-4 md:mt-8">
+      <div class="flex justify-between items-center">
+        <h1 class="mb-0 p-4 text-xl font-medium theme-text md:text-3xl">Report</h1>
+        @if (editModeCase) {
+          <div class="flex items-center">
+            <p-button text icon="pi pi-times" (click)="switchEditReport()" />
+            <p-button text icon="pi pi-check" (click)="updateReport()" />
+          </div>
+        } @else {
+          <p-button text icon="pi pi-pencil" (click)="switchEditReport()" />
+        }
+      </div>
+
+      <div class="px-4">
+        @defer {
+        @if (editModeCase) {
+        <textarea rows="5" fluid pTextarea #caseReportInput formControlName="report"
+          placeholder="You can type **markdown** syntax in here"></textarea>
+
+        <div class="prose dark:prose-invert max-w-full md mt-4">
+          <markdown [data]="caseReportInput.value"></markdown>
+        </div>
+        } @else {
+        <div class="prose dark:prose-invert md max-w-full line-clamp-6">
+          <markdown [data]="caseMeta?.report || 'No data'"></markdown>
+        </div>
+        }
+        } @placeholder (minimum 0.4s) {
+        <p-skeleton height="7rem"></p-skeleton>
+        }
+      </div>
+    </p-card>
+  </div>
+
+  <div class="mt-4">
+    <p-card styleClass="mt-4">
+      <div class="flex justify-between items-center">
+        <h1 class="mb-0 p-4 text-xl font-medium theme-text md:text-3xl">Samples</h1>
+        <p-button icon="pi pi-plus" styleClass="theme-text" text (click)="uploadInput.click()" />
+      </div>
+
+      <div class="mx-auto block md:grid md:grid-cols-2 lg:grid-cols-3 gap-1 w-full p-2 px-4">
+        @defer () {
+        @for (sample of caseSamples; track sample) {
+        <div
+          class="flex items-center justify-between rounded-xl cursor-pointer p-4 hover:bg-gray-100 dark:hover:bg-black"
+          (click)="openSample(sample.guid)">
+          <div class="w-full flex gap-4">
+            <div class="w-full text-sm leading-6">
+              <a class="font-medium text-gray-900 dark:text-gray-200">
+                <div class="relative">
+                  <span class="truncate block">{{ sample.name }}</span>
+                  @if (!sample.report || !sample.tags.length) {<span
+                    class="absolute top-0 -left-2 size-2 rounded-full theme-bg"></span>}
+                </div>
+              </a>
+              <div class="text-gray-500">{{ sample.opsystem }} - {{ sample.size |
+                fileSize }} - {{ sample.created | date: 'YYYY-MM-dd' }}</div>
+              <div class="overflow-x-scroll no-scrollbar whitespace-nowrap ">@for (tag of
+                sample.tags; track $index) {<span
+                  class="bg-purple-100 text-purple-800 text-xs font-medium me-2 px-2.5 py-0.5 rounded-sm dark:bg-purple-500 dark:text-purple-100">{{
+                  tag }}</span>} @empty {<span
+                  class="bg-gray-100 text-gray-800 text-xs font-medium me-2 px-2.5 py-0.5 rounded-sm dark:bg-gray-600 dark:text-gray-300">No
+                  Tag</span>}</div>
+            </div>
+          </div>
+        </div>
+        } @empty {
+        <div class="flex justify-center col-span-full">
+          <div class="p-4 mx-auto max-w-screen-xl">
+            <div class="max-w-screen-md">
+              <div class="flex justify-center items-center">
+                <h2 class="mb-0 text-2xl tracking-wide font-semibold text-gray-900">
+                  No sample
+                </h2>
+              </div>
+              <p class="mt-4 font-light text-center text-gray-500">
+                Add your first sample
+              </p>
+            </div>
+          </div>
+        </div>
+        }
+        } @placeholder (minimum 0.4s) {
+        @for(_ of [1,2]; track _) {
+        <p-skeleton height="5rem"></p-skeleton>
+        }
+        }
+      </div>
+    </p-card>
+  </div>
+
+  <div class="mt-4" #sampleTabContent>
+    @if (displayedSamples.length) {
+    <p-tabs [value]="selectedSampleTabID" scrollable>
+      <p-tablist>
+        @for (sample of displayedSamples; track sample.guid) {
+        <p-tab [value]="sample.guid" class="dark:text-gray-200">
+          <div class="relative flex items-center">
+            @if (!sample.report || !sample.tags.length) {<span
+              class="absolute top-0 -left-3.5 size-3 rounded-full theme-bg"></span>}
+            {{ sample.name }}@if (editedSampleID == sample.guid) {<span class="ml-2 pi pi-pencil"></span>}
+            <p-button (click)="closeDisplayedSample($index)" severity="danger" text icon="pi pi-times" class="ml-1" />
+          </div>
+        </p-tab>
+        }
+      </p-tablist>
+
+      <p-tabpanels>
+        @for (sample of displayedSamples; track sample.guid) {
+        <p-tabpanel [value]="sample.guid" [formGroup]="sampleForm">
+          <div class="slide-y mt-4">
+            <div class="flex items-center justify-end gap-2">
+              @if (editedSampleID == sample.guid) {
+              <p-button severity="danger" (click)="editedSampleID = null" icon="pi pi-times" label="Cancel" text />
+              <p-button severity="success" [disabled]="!sampleForm.valid" (click)="updateSample()" icon="pi pi-check"
+                text label="Save" />
+              } @else {
+              <p-button severity="secondary" icon="pi pi-pencil" [disabled]="editedSampleID"
+                (click)="editedSampleID = sample.guid" label="Edit" text />
+              <p-button severity="primary" icon="pi pi-ellipsis-h"
+                (click)="menuSampleSelected = sample.guid; menuSample.toggle($event)" text />
+              }
+            </div>
+
+            <div class="flex flex-col md:grid md:grid-cols-3 gap-4 mt-4">
+              <div class="md:col-span-2">
+                <cdk-accordion multi>
+                  <cdk-accordion-item #report="cdkAccordionItem" expanded>
+                    <div class="event-box dark:bg-surface-800 block md:flex">
+                      <div class="flex items-center">
+                        <div class="text-lg flex items-center grow theme-text cursor-pointer" (click)="report.toggle()">
+                          <i class="material-symbols-outlined mr-1">lab_research</i>Report
+                        </div>
+
+                        <i (click)="report.toggle()"
+                          class="cursor-pointer material-symbols-outlined dark:text-gray-300">{{ report.expanded
+                          ? 'keyboard_arrow_up' : 'keyboard_arrow_down' }}</i>
+                      </div>
+
+                      <div class="event-box-text" [style.display]="report.expanded ? '' : 'none'">
+                        @if (editedSampleID == sample.guid) {
+                        <textarea rows="8" class="w-full" pTextarea #sampleReportInput formControlName="report"
+                          placeholder="You can type **markdown** syntax in here"></textarea>
+
+                        <div class="block md:flex prose dark:prose-invert max-w-full md mt-4">
+                          <markdown [data]="sampleReportInput.value"></markdown>
+                        </div>
+                        } @else {
+                        <div class="block md:flex prose dark:prose-invert max-w-full md">
+                          <markdown [data]="sample.report || 'No data'" ngPreserveWhitespaces></markdown>
+                        </div>
+                        }
+                      </div>
+                    </div>
+                  </cdk-accordion-item>
+
+                  <cdk-accordion-item #indicators="cdkAccordionItem" expanded>
+                    <div class="event-box dark:bg-surface-800 mt-4">
+                      <div class="flex items-center">
+                        <div class="text-lg flex items-center grow theme-text cursor-pointer"
+                          (click)="indicators.toggle()">
+                          <i class="material-symbols-outlined mr-1">action_key</i>Indicators
+                        </div>
+
+                        <div class="flex items-center">
+                          <i (click)="indicators.toggle()"
+                            class="cursor-pointer material-symbols-outlined dark:text-gray-300">{{
+                            indicators.expanded ?
+                            'keyboard_arrow_up' : 'keyboard_arrow_down' }}</i>
+                        </div>
+                      </div>
+
+                      <div [style.display]="indicators.expanded ? '' : 'none'">
+                        <div class="event-box-text dark:text-gray-300">
+                          @if (editedSampleID == sample.guid) {
+                          <div class="flex flex-col gap-2" formArrayName="indicators">
+                            @for (indicatorGroup of indicatorsFormArray.controls; track indicatorGroup) {
+                            <div class="flex w-full gap-2 items-center" [formGroupName]="$index">
+                              <p-floatlabel variant="in" class="w-full">
+                                <p-select id="nature" [options]="sampleAvailableIndicatorNature"
+                                  formControlName="nature" placeholder="Indicator nature" class="w-full" />
+                                <label for="nature">Nature</label>
+                              </p-floatlabel>
+
+                              <p-floatlabel variant="in" class="w-full">
+                                <input id="value" formControlName="value" pInputText class="w-full" />
+                                <label for="value">Value</label>
+                              </p-floatlabel>
+
+                              <p-button icon="pi pi-times" severity="danger" text (click)="removeIndicator($index)" />
+                            </div>
+                            }
+                          </div>
+
+                          <div class="flex p-2">
+                            <p-button label="Indicator" icon="pi pi-plus" severity="secondary" text
+                              (click)="addIndicator()" />
+                          </div>
+                          } @else {
+                          @for (indicator of sample.indicators; track $index) {
+                          <div class="mt-2 p-1 relative">
+                            <span class="flex-[0_0_18ch] font-mono">{{ indicator.nature }}</span>
+                            <div class="group truncate">
+                              <span [cdkCopyToClipboard]="indicator.value" pTooltip="Click to copy"
+                                class="text-gray-700 dark:text-gray-300 font-mono cursor-pointer">{{ indicator.value
+                                }}</span>
+
+                              <div
+                                class="absolute invisible opacity-0 group-hover:visible group-hover:opacity-100 bottom-full left-1/2 -translate-x-1/2 mb-1 w-96
+                                transition-all duration-300 ease-out transform group-hover:translate-y-0 translate-y-2">
+                                <div
+                                  class="relative p-4 bg-gray-900/95 dark:bg-surface-700 rounded-2xl border border-white/10 shadow-md">
+                                  <div class="flex items-center gap-3 mb-2">
+                                    <h3 class="text-sm font-semibold text-white">{{ indicator.nature }}</h3>
+                                  </div>
+
+                                  <div class="space-y-2">
+                                    <p class="text-base text-wrap whitespace-normal text-gray-300">
+                                      {{ indicator.value }}
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                          } @empty { No indicator specified. }
+                          }
+                        </div>
+                      </div>
+                    </div>
+                  </cdk-accordion-item>
+
+                  <cdk-accordion-item #rules="cdkAccordionItem" [expanded]="editedSampleID == sample.guid">
+                    <div class="event-box dark:bg-surface-800 mt-4">
+                      <div class="flex items-center">
+                        <div class="text-lg flex items-center grow theme-text cursor-pointer" (click)="rules.toggle()">
+                          <i class="material-symbols-outlined mr-1">lab_panel</i>Rules
+                        </div>
+
+                        <div class="flex items-center">
+                          <i (click)="rules.toggle()"
+                            class="cursor-pointer material-symbols-outlined dark:text-gray-300">{{ rules.expanded
+                            ? 'keyboard_arrow_up' : 'keyboard_arrow_down' }}</i>
+                          @if (editedSampleID != sample.guid) {
+                          <p-button text icon="pi pi-download" severity="secondary" pTooltip="Download"
+                            (click)="downloadRuleset(sample.guid)" />
+                          }
+                        </div>
+                      </div>
+
+                      <div class="m-0-tabs" [style.display]="rules.expanded ? '' : 'none'"
+                        [formGroup]="rulesetsFormGroup">
+                        <p-tabs value="yara">
+                          <p-tablist>
+                            @for (rule of sample.rulesets | keyvalue; track rule) {
+                            <p-tab [value]="rule.key">{{ rule.key }}</p-tab>
+                            }
+                          </p-tablist>
+                          <p-tabpanels>
+                            @for (rule of sample.rulesets | keyvalue; track rule) {
+                            <p-tabpanel [value]="rule.key">
+                              @if (editedSampleID == sample.guid) {
+                              <textarea rows="4" [id]="rule.key" class="w-full mt-1" pTextarea #sampleReportInput
+                                [formControlName]="rule.key"></textarea>
+                              } @else {
+                              <div class="bg-slate-50 dark:bg-surface-900 shadow-sm p-4 mono whitespace-pre-wrap">{{
+                                rule.value || 'No data' }}</div>
+                              }
+                            </p-tabpanel>
+                            }
+                          </p-tabpanels>
+                        </p-tabs>
+                      </div>
+                    </div>
+                  </cdk-accordion-item>
+                </cdk-accordion>
+              </div>
+
+              <div>
+                <div class="event-box dark:bg-surface-800">
+                  <div class="text-lg flex items-center grow theme-text">
+                    <i class="material-symbols-outlined mr-1">biotech</i>Metadata
+                  </div>
+                  <div class="event-box-text dark:text-gray-300">
+                    <div>
+                      <span class="flex-[0_0_10ch]">Name</span>
+                      <span class="truncate">{{ sample.name }}</span>
+                    </div>
+                    <div>
+                      <span class="flex-[0_0_10ch]">Date</span>
+                      <span>{{ sample.created | date: 'YYYY-MM-dd' }}</span>
+                    </div>
+                    <div>
+                      <span class="flex-[0_0_10ch]">Size</span>
+                      <span>{{ sample.size | fileSize }}</span>
+                    </div>
+                    <div>
+                      <span class="flex-[0_0_10ch]">GUID</span>
+                      <span class="cursor-pointer truncate font-mono" pTooltip="Click to copy"
+                        [cdkCopyToClipboard]="sample.guid">{{ sample.guid
+                        }}</span>
+                    </div>
+
+                    @for (digest of sample.digests | keyvalue; track digest) {
+                    <div>
+                      <span class="flex-[0_0_10ch]" style="text-transform: uppercase;">{{ digest.key }}</span>
+                      <span class="cursor-pointer truncate font-mono" pTooltip="Click to copy"
+                        [cdkCopyToClipboard]="digest.value">{{
+                        digest.value
+                        }}</span>
+                    </div>
+                    }
+
+                    <div class="flex">
+                      <span class="flex-[0_0_10ch]">Tags</span>
+                      @if (editedSampleID == sample.guid) {
+                      <div class="w-full flex flex-col">
+                        <p-floatlabel variant="in" class="w-full">
+                          <p-autocomplete #autoTagsComplete dropdown (onSelect)="addTag()" [formControl]="tagsInput"
+                            [autoOptionFocus]="true" [showEmptyMessage]="false" id="tags" fluid
+                            (completeMethod)="searchTags($event)" [suggestions]="sampleFilteredTags"
+                            (keyup.enter)="addTag()" />
+                          <label for="tags">Tags</label>
+                        </p-floatlabel>
+
+                        <div class="mt-2 flex flex-wrap gap-2">
+                          @for (tag of tags; track tag) {
+                          <p-chip
+                            styleClass="bg-purple-100 text-purple-800 text-xs font-medium rounded dark:bg-purple-500 dark:text-purple-100"
+                            [label]="tag" [removable]="true" (onRemove)="removeTag($index)" />
+                          }
+                        </div>
+                      </div>
+                      } @else {
+                      <div class="flex flex-wrap gap-2">
+                        @for (tag of sample.tags; track tag) {
+                        <span
+                          class="bg-purple-100 text-purple-800 flex items-center text-xs font-medium me-2 px-2.5 py-0.5 rounded-sm dark:bg-purple-500 dark:text-purple-100">{{
+                          tag }}</span>
+                        } @empty { <span
+                          class="bg-gray-100 text-gray-800 text-xs font-medium me-2 px-2.5 py-0.5 rounded-sm dark:bg-gray-600 dark:text-gray-300">No
+                          Tag</span> }
+                      </div>
+                      }
+                    </div>
+                  </div>
+                </div>
+
+                <div class="event-box dark:bg-surface-800 mt-4">
+                  <div class="flex items-center">
+                    <div class="text-lg flex items-center grow theme-text">
+                      <i class="material-symbols-outlined mr-1">lab_panel</i>Symbols
+                    </div>
+
+                    <div class="flex items-center">
+                      @if (editedSampleID == sample.guid) {
+                      @if (objKeysCount(sampleForm.get('symbols')?.value)) {
+                      <p-button severity="danger" pTooltip="Cancel" (click)="cancelSymbolsUpload()" text
+                        icon="pi pi-times" />
+                      } @else {
+                      <p-button severity="primary" pTooltip="Upload" (click)="uploadSymbolsInput.click()" text
+                        icon="pi pi-upload" />
+                      <input type="file" class="hidden" #uploadSymbolsInput (change)="onSymbolsUpload($event)">
+                      }
+                      } @else {<p-button severity="secondary" [disabled]="!objKeysCount(sample.symbols)"
+                        pTooltip="Download" (click)="downloadSymbols(sample.guid)" text icon="pi pi-download" />}
+                    </div>
+                  </div>
+
+                  <div class="event-box-text dark:text-gray-300">
+                    @if (editedSampleID == sample.guid) {
+                    @for (symbol of sampleForm.get('symbols')?.value | keyvalue; track symbol) {
+                    <div>
+                      <span class="flex-[0_0_18ch] font-mono font-semibold">{{ symbol.key | hex }}</span>
+                      <span class="event-box-text-content font-mono truncate">{{ symbol.value }}</span>
+                    </div>
+                    } @empty { No symbols specified. }
+                    } @else {
+                    @for (symbol of sample.symbols | keyvalue; track symbol) {
+                    <div>
+                      <span [cdkCopyToClipboard]="symbol.key|hex" pTooltip="Click to copy"
+                        class="flex-[0_0_18ch] font-mono font-semibold cursor-pointer">{{ symbol.key | hex }}</span>
+                      <span [cdkCopyToClipboard]="symbol.value" pTooltip="Click to copy"
+                        class="event-box-text-content font-mono truncate cursor-pointer">{{ symbol.value }}</span>
+                    </div>
+                    } @empty { No symbols specified. }
+                    }
+                  </div>
+                </div>
+
+                <div class="event-box dark:bg-surface-800 mt-4">
+                  <div class="flex items-center justify-between">
+                    <h1 class="mb-0 p-2 pb-4 text-xl font-medium theme-text">
+                      <i class="pi pi-microchip mr-1"></i>Analyzers
+                    </h1>
+                    <p-button (click)="refreshAnalyses(sample.guid)" pTooltip="Refresh" severity="help" text>
+                      <i class="pi pi-refresh" id="refreshAnalysesIcon"></i></p-button>
+                  </div>
+
+                  <div class="flex flex-col gap-2 mt-2">
+                    @defer (when analyses[sample.guid]) {
+                    @for (a_info of analyzerInfos; track a_info) {
+                    <div
+                      class="flex items-center justify-between gap-2 rounded p-2 hover:bg-gray-100 dark:hover:bg-surface-700">
+                      <p class="text-sm font-semibold text-gray-900 dark:text-slate-300"
+                        [pTooltip]="a_info.name + ' ' + a_info.version">{{ a_info.name }}</p>
+
+                      <div class="flex items-center justify-end gap-2">
+                        @if (analyses[sample.guid][a_info.name]) {
+                        @if (['pending','queued'].includes(analyses[sample.guid][a_info.name].status)) {
+                        <span
+                          class="inline-flex items-center bg-gray-100 text-gray-800 text-xs font-medium px-2.5 py-0.5 rounded-full dark:bg-gray-900 dark:text-gray-300">
+                          <span class="w-2 h-2 me-1 bg-gray-500 rounded-full"></span>
+                          Pending
+                        </span>
+                        }
+
+                        @else if (['extracting','processing'].includes(analyses[sample.guid][a_info.name].status)) {
+                        <span
+                          class="inline-flex items-center bg-blue-100 text-blue-800 text-xs capitalize font-medium px-2.5 py-0.5 rounded-full dark:bg-blue-900 dark:text-blue-300">
+                          <span class="w-2 h-2 me-1 bg-blue-500 rounded-full"></span>
+                          {{ analyses[sample.guid][a_info.name].status }}
+                        </span>
+                        }
+
+                        @else if (analyses[sample.guid][a_info.name].status == 'success') {
+                        <span
+                          class="inline-flex items-center bg-green-100 text-green-800 text-xs font-medium px-2.5 py-0.5 rounded-full dark:bg-green-900 dark:text-green-300">
+                          <span class="w-2 h-2 me-1 bg-green-500 rounded-full"></span>
+                          Success
+                        </span>
+                        }
+
+                        @else {
+                        <span
+                          class="inline-flex items-center bg-red-100 text-red-800 text-xs font-medium px-2.5 py-0.5 rounded-full dark:bg-red-900 dark:text-red-300">
+                          <span class="w-2 h-2 me-1 bg-red-500 rounded-full"></span>
+                          Failure
+                        </span>
+                        }
+                        }
+
+                        <p-button text severity="secondary" icon="pi pi-ellipsis-h"
+                          (click)="constructMenu($event, sample.guid, a_info.name)" />
+                      </div>
+                    </div>
+                    }
+                    } @placeholder (minimum 0.4s) {
+                    @for (_ of [1,2,3]; track _) {
+                    <div class="mt-1">
+                      <p-skeleton height="2rem" />
+                    </div>
+                    }
+                    }
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </p-tabpanel>
+        }
+      </p-tabpanels>
+    </p-tabs>
+    }
+  </div>
+</section>
+
+<div class="hidden fixed top-0 left-0 w-full h-full bg-gray-100 dark:bg-surface-900 z-50" [class.flex!]="isDragging">
+  <div class="m-auto w-2/3 h-2/3 rounded-md bg-white dark:bg-black">
+    <div class="h-full flex flex-col items-center justify-center gap-4">
+      <i class="pi pi-upload text-lg"></i>
+      <div>Drop your archive to start uploading the sample(s)</div>
+    </div>
+  </div>
+</div>
+<input type="file" class="hidden" #uploadInput (change)="onSampleUpload($event)">
+
+<p-menu #menuSample [model]="menuSampleItems" [popup]="true" />
+<p-menu #caseMenu [model]="caseMenuItems" [popup]="true" />
+<p-menu #actionsMenu [model]="actionsMenuItems" appendTo="body" [popup]="true" />
+
+@if (uploadProgress) {
+<div class="fixed top-0 left-0 z-50 w-screen h-screen flex items-center justify-center"
+  style="background: rgba(0, 0, 0, 0.3);">
+  <div class="bg-white border py-2 px-5 w-full max-w-xl rounded-lg flex items-center flex-col">
+    <div class="upload-loader-dots block relative w-20 h-5 mt-2">
+      <div class="absolute top-0 mt-1 w-3 h-3 rounded-full theme-bg"></div>
+      <div class="absolute top-0 mt-1 w-3 h-3 rounded-full theme-bg"></div>
+      <div class="absolute top-0 mt-1 w-3 h-3 rounded-full theme-bg"></div>
+      <div class="absolute top-0 mt-1 w-3 h-3 rounded-full theme-bg"></div>
+    </div>
+    <div class="mt-2 flex flex-col items-center gap-1">
+      <span class="text-gray-700 text-sm font-medium">Uploading sample...</span>
+      <span class="text-gray-400 text-sm">{{ uploadProgress }}</span>
+    </div>
+  </div>
+</div>
+}
