@@ -172,9 +172,6 @@ class Storage(FusionStorage):
             )
             return False
         case_storage = self.case_storage(case_guid)
-        # update case metadata
-        case.guid = next_case_guid
-        case.to_filepath(case_storage.metadata)
         # rename case directory
         next_directory = case_storage.directory.parent / str(next_case_guid)
         try:
@@ -186,6 +183,11 @@ class Storage(FusionStorage):
                 next_case_guid,
             )
             return False
+        # update case metadata
+        case_storage = self.case_storage(next_case_guid)
+        case.guid = next_case_guid
+        case.managed = True
+        case.to_filepath(case_storage.metadata)
         return True
 
     async def create_case(self, managed: bool, dct) -> Case | None:
