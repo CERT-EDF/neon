@@ -41,7 +41,7 @@ Basic HTTP example using Nginx:
 ```nginx
 server {
     listen 80;
-    server_name carbon.domain.lan;
+    server_name neon.domain.lan;
 
     access_log  /var/log/nginx/neon.access.log;
     error_log  /var/log/nginx/neon.error.log
