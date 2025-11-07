@@ -24,7 +24,8 @@ FROM python:3.12-alpine AS production
 # -----------------------------------------------------------------------------
 # FINAL SETUP
 # -----------------------------------------------------------------------------
-RUN mkdir -p /analyzer/floss && \
+RUN apk add libstdc++ && \
+    mkdir -p /analyzer/floss && \
     ln -s /venv/bin/floss /analyzer/floss/floss
 # -----------------------------------------------------------------------------
 # COPY FROM BUILD IMAGE
