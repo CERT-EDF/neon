@@ -49,6 +49,8 @@ async def _capa_process_impl(
     analysis_storage.data_dir.mkdir(parents=True, exist_ok=True)
     output = analysis_storage.data_dir / 'output.txt'
     with analysis_storage.log.open('wb') as logf:
+        logf.write(f'{argv}\n'.encode('utf-8'))
+        logf.flush()
         with output.open('wb') as datf:
             success = await create_subprocess_and_wait(
                 argv, stdout=datf, stderr=logf

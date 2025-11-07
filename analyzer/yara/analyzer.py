@@ -40,7 +40,7 @@ async def _yara_process_impl(
     argv = [str(config.program), '-N', '-r']
     if config.compiled:
         argv.append('-C')
-    argv.extend(config.rule_files)
+    argv.extend([str(rule_file) for rule_file in config.rule_files])
     argv.append(str(sample_raw))
     analysis_storage = storage.analysis_storage(
         a_task.primary_digest, info.name
@@ -48,6 +48,8 @@ async def _yara_process_impl(
     analysis_storage.data_dir.mkdir(parents=True, exist_ok=True)
     output = analysis_storage.data_dir / 'output.txt'
     with analysis_storage.log.open('wb') as logf:
+        logf.write(f'{argv}\n'.encode('utf-8'))
+        logf.flush()
         with output.open('wb') as datf:
             success = await create_subprocess_and_wait(
                 argv, stdout=datf, stderr=logf

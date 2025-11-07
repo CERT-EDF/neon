@@ -13,6 +13,9 @@ from edf_neon_server.storage import Storage
 _LOGGER = get_logger('analyzer.floss', root='neon')
 
 
+FLOSS_DEFAULT_MAX_FILE_SIZE = 16 * 1024 * 1024
+
+
 @dataclass(kw_only=True)
 class FLOSSAnalyzerConfig(FusionAnalyzerConfig):
     """FLOSS Analyzer Config"""
@@ -32,19 +35,23 @@ async def _floss_process_impl(
     storage: Storage,
     a_task: AnalyzerTask,
 ) -> bool:
+    tags = set()
+    for _, sample in a_task.samples:
+        tags.update(sample.tags)
+    argv = [str(config.program)]
     sample_raw = storage.sample_raw(a_task.primary_digest)
-    argv = [
-        str(config.program),
-        '--color',
-        'never',
-        str(sample_raw),
-    ]
+    large_file = sample_raw.stat().st_size > FLOSS_DEFAULT_MAX_FILE_SIZE
+    if 'pebin' not in tags or large_file:
+        argv.extend(['--no', 'stack', 'tight', 'decoded'])
+    argv.extend(['--color', 'never', str(sample_raw)])
     analysis_storage = storage.analysis_storage(
         a_task.primary_digest, info.name
     )
     analysis_storage.data_dir.mkdir(parents=True, exist_ok=True)
     output = analysis_storage.data_dir / 'output.txt'
     with analysis_storage.log.open('wb') as logf:
+        logf.write(f'{argv}\n'.encode('utf-8'))
+        logf.flush()
         with output.open('wb') as datf:
             success = await create_subprocess_and_wait(
                 argv, stdout=datf, stderr=logf
@@ -61,7 +68,7 @@ def main():
         info=AnalyzerInfo(
             name='floss',
             tags={},
-            version='0.1.0',
+            version='0.1.1',
         ),
         config_cls=FLOSSAnalyzerConfig,
         process_impl=_floss_process_impl,
