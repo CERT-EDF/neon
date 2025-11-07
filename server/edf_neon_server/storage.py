@@ -1,9 +1,11 @@
 """Neon Storage"""
 
+from asyncio import get_running_loop
 from collections.abc import AsyncIterator, Iterator
 from dataclasses import dataclass
 from functools import cached_property
 from hashlib import new
+from io import BufferedIOBase
 from pathlib import Path
 from typing import Type
 from uuid import UUID
@@ -12,6 +14,7 @@ from edf_fusion.concept import AnalyzerInfo
 from edf_fusion.helper.filesystem import GUID_GLOB, iter_guid_items
 from edf_fusion.helper.flock import Flock
 from edf_fusion.helper.logging import get_logger
+from edf_fusion.helper.streaming import stream_from_fobj
 from edf_fusion.helper.zip import create_zip
 from edf_fusion.server.storage import ConceptStorage, FusionStorage
 from edf_neon_core.concept import (
@@ -29,16 +32,17 @@ from .config import NeonStorageConfig
 _LOGGER = get_logger('server.storage', root='neon')
 
 
-async def _autopsy(name: str, content: bytes) -> Sample:
-    size = len(content)
+def _autopsy(name: str, fobj: BufferedIOBase) -> Sample:
+    fobj.seek(0)
     digests = {alg: new(alg) for alg in Digests.algorithms()}
-    for digest in digests.values():
-        digest.update(content)
+    for chunk in stream_from_fobj(fobj):
+        for digest in digests.values():
+            digest.update(chunk)
     digests = {alg: digest.hexdigest() for alg, digest in digests.items()}
     digests = Digests.from_dict(digests)
     return Sample(
         name=name,
-        size=size,
+        size=fobj.tell(),
         digests=digests,
         indicators=[
             Indicator(value=digests.md5, nature=IndicatorNature.MD5),
@@ -47,6 +51,16 @@ async def _autopsy(name: str, content: bytes) -> Sample:
             Indicator(value=digests.sha512, nature=IndicatorNature.SHA512),
         ],
     )
+
+
+def _store(sample: Sample, sample_zip: Path, fobj: BufferedIOBase):
+    fobj.seek(0)
+    filename = sample.digests.primary_digest
+    with AESZipFile(sample_zip, 'w', encryption=WZ_AES) as zipf:
+        zipf.setpassword(filename.encode('utf-8'))
+        with zipf.open(filename, 'w') as zfobj:
+            for chunk in stream_from_fobj(fobj):
+                zfobj.write(chunk)
 
 
 def _storage_instances(
@@ -236,15 +250,20 @@ class Storage(FusionStorage):
             yield Case.from_filepath(metadata)
 
     async def create_sample(
-        self, case_guid: UUID, name: str, content: bytes
+        self, case_guid: UUID, name: str, fobj: BufferedIOBase
     ) -> Sample | None:
         """Create case sample"""
-        sample = await _autopsy(name, content)
+        loop = get_running_loop()
+        _LOGGER.info("sample autopsy for '%s' in %s", name, case_guid)
+        sample = await loop.run_in_executor(None, _autopsy, name, fobj)
         sample_zip = self.sample_zip(sample.primary_digest)
-        filename = sample.digests.primary_digest
-        with AESZipFile(sample_zip, 'w', encryption=WZ_AES) as zipf:
-            zipf.setpassword(filename.encode('utf-8'))
-            zipf.writestr(filename, content)
+        if not sample_zip.is_file():
+            async with Flock(filepath=sample_zip):
+                _LOGGER.info("storing sample '%s' in %s", name, sample_zip)
+                await loop.run_in_executor(
+                    None, _store, sample, sample_zip, fobj
+                )
+        _LOGGER.info("referencing sample '%s' in %s", name, case_guid)
         sample_storage = self.sample_storage(case_guid, sample.guid)
         sample_storage.create()
         sample.to_filepath(sample_storage.metadata)
@@ -291,7 +310,7 @@ class Storage(FusionStorage):
         """Enumerate samples primary digests"""
         if not self.data_dir.is_dir():
             return
-        for sample_zip in self.data_dir.iterdir():
+        for sample_zip in self.data_dir.glob('*.zip'):
             yield sample_zip.stem
 
     async def retrieve_analysis(

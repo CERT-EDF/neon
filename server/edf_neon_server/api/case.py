@@ -1,6 +1,7 @@
 """/api/case* routes implementation"""
 
 from collections.abc import Iterator
+from io import BufferedIOBase
 from pathlib import Path
 from uuid import uuid4
 
@@ -240,14 +241,14 @@ async def _receive_multipart_data(
 
 def _items_from_archive(
     archive: Path, secret: bytes
-) -> Iterator[tuple[str, bytes]]:
+) -> Iterator[tuple[str, BufferedIOBase]]:
     with AESZipFile(str(archive), 'r') as zipf:
         zipf.setpassword(secret)
         for info in zipf.infolist():
             if info.is_dir():
                 continue
             with zipf.open(info, 'r') as fobj:
-                yield info.filename, fobj.read()
+                yield info.filename, fobj
 
 
 async def api_sample_post(request: Request):
@@ -280,8 +281,8 @@ async def api_sample_post(request: Request):
     # extract samples from archive
     samples = []
     try:
-        for filename, content in _items_from_archive(archive, secret):
-            sample = await storage.create_sample(case_guid, filename, content)
+        for filename, fobj in _items_from_archive(archive, secret):
+            sample = await storage.create_sample(case_guid, filename, fobj)
             samples.append(sample)
     except RuntimeError:
         _LOGGER.warning("invalid password")

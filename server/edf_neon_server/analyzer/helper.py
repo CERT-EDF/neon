@@ -114,9 +114,10 @@ def _extract_sample(storage: Storage, a_task: AnalyzerTask) -> Path:
 async def extract_sample(storage: Storage, a_task: AnalyzerTask) -> bool:
     """Extract sample data"""
     success = False
+    sample_zip = storage.sample_zip(a_task.primary_digest)
     sample_raw = storage.sample_raw(a_task.primary_digest)
     _LOGGER.info("waiting flock for sample %s", a_task.primary_digest)
-    async with Flock(filepath=sample_raw):
+    async with Flock(filepath=sample_zip):
         if sample_raw.is_file():
             _LOGGER.info(
                 "extraction skipped for sample %s", a_task.primary_digest

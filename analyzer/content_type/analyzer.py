@@ -114,10 +114,7 @@ async def _ct_process_impl(
     )
     with analysis_storage.log.open('wb') as logf:
         for argv, filename in specs:
-            logf.write(b'========================================\n')
-            logf.write(str(argv).encode('utf-8'))
-            logf.write(b'\n')
-            logf.write(b'----------------------------------------\n')
+            logf.write(f'{argv}\n'.encode('utf-8'))
             logf.flush()
             output = analysis_storage.data_dir / filename
             with output.open('wb') as datf:
