@@ -66,6 +66,19 @@ services:
       ROLE: analyzer
       FUSION_DEBUG: 0
 
+  neon-analyzer-die:
+    build:
+      context: ./analyzer/die
+      no_cache: true
+    image: cert-edf/neon-be-die
+    pull_policy: build
+    volumes:
+      - /data/neon/conf:/conf
+      - /data/neon/data:/data
+    environment:
+      ROLE: analyzer
+      FUSION_DEBUG: 0
+
   neon-analyzer-floss:
     build: 
       context: ./analyzer/floss
