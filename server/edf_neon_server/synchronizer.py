@@ -54,7 +54,7 @@ def app():
     config = NeonServerConfig.from_filepath(args.config)
     synchronizer = FusionSynchronizer(
         config=config.synchronizer,
-        storage=Storage(config=config.storage),
+        storage=Storage(redis=None, config=config.storage),
         sync_case_impl=_sync_case_impl,
     )
     synchronizer.run()

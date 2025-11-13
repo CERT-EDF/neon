@@ -1,5 +1,15 @@
 services:
 
+  neon-redis:
+    image: redis:alpine
+    command: redis-server --save 300 1 --loglevel warning
+    networks:
+      - private
+    volumes:
+      - /data/neon/redis:/data
+    environment:
+      SKIP_DROP_PRIVS: 1
+
   neon-frontend:
     build:
       context: ./web
@@ -12,22 +22,27 @@ services:
       - 127.0.0.1:8123:80
 
   neon-backend:
-    build: 
+    build:
       context: ./server/docker
       no_cache: true
     image: cert-edf/neon-be
     pull_policy: build
     ports:
       - 127.0.0.1:8113:8080
+    networks:
+      - default
+      - private
     volumes:
       - /data/neon/conf:/conf
       - /data/neon/data:/data
+    depends_on:
+      - neon-redis
     environment:
       ROLE: server
       FUSION_DEBUG: 0
 
   neon-synchronizer:
-    build: 
+    build:
       context: ./server/docker
       no_cache: true
     image: cert-edf/neon-be
@@ -40,28 +55,36 @@ services:
       FUSION_DEBUG: 0
 
   neon-analyzer-capa:
-    build: 
+    build:
       context: ./analyzer/capa
       no_cache: true
     image: cert-edf/neon-be-capa
     pull_policy: build
+    networks:
+      - private
     volumes:
       - /data/neon/conf:/conf
       - /data/neon/data:/data
       - /data/neon/analyzer/capa/rules:/analyzer/capa/rules
+    depends_on:
+      - neon-redis
     environment:
       ROLE: analyzer
       FUSION_DEBUG: 0
 
   neon-analyzer-ct:
-    build: 
+    build:
       context: ./analyzer/content_type
       no_cache: true
     image: cert-edf/neon-be-ct
     pull_policy: build
+    networks:
+      - private
     volumes:
       - /data/neon/conf:/conf
       - /data/neon/data:/data
+    depends_on:
+      - neon-redis
     environment:
       ROLE: analyzer
       FUSION_DEBUG: 0
@@ -80,28 +103,39 @@ services:
       FUSION_DEBUG: 0
 
   neon-analyzer-floss:
-    build: 
+    build:
       context: ./analyzer/floss
       no_cache: true
     image: cert-edf/neon-be-floss
     pull_policy: build
+    networks:
+      - private
     volumes:
       - /data/neon/conf:/conf
       - /data/neon/data:/data
+    depends_on:
+      - neon-redis
     environment:
       ROLE: analyzer
       FUSION_DEBUG: 0
 
   neon-analyzer-yara:
-    build: 
+    build:
       context: ./analyzer/yara
       no_cache: true
     image: cert-edf/neon-be-yara
     pull_policy: build
+    networks:
+      - private
     volumes:
       - /data/neon/conf:/conf
       - /data/neon/data:/data
       - /data/neon/analyzer/yara/rules:/analyzer/yara/rules
+    depends_on:
+      - neon-redis
     environment:
       ROLE: analyzer
       FUSION_DEBUG: 0
+
+networks:
+  private:
