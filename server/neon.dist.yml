@@ -81,6 +81,12 @@ analyzer:
     program_file: /analyzer/ct/file
     program_magika: /analyzer/ct/magika
   # ------------------------------------------------------------------------------
+  # die configuration
+  die:
+    enabled: false
+    workers: 1
+    program: /analyzer/die/diec
+  # ------------------------------------------------------------------------------
   # floss configuration
   floss:
     enabled: false
