@@ -6,8 +6,8 @@ from re import compile as regexp
 from shutil import copyfileobj
 
 from edf_fusion.concept import AnalyzerInfo
-from edf_fusion.helper.flock import Flock
 from edf_fusion.helper.logging import get_logger
+from edf_fusion.helper.redis import create_redis_lock
 from edf_neon_core.concept import Analysis, Status
 from pyzipper import AESZipFile
 
@@ -114,10 +114,11 @@ def _extract_sample(storage: Storage, a_task: AnalyzerTask) -> Path:
 async def extract_sample(storage: Storage, a_task: AnalyzerTask) -> bool:
     """Extract sample data"""
     success = False
-    sample_zip = storage.sample_zip(a_task.primary_digest)
-    sample_raw = storage.sample_raw(a_task.primary_digest)
-    _LOGGER.info("waiting flock for sample %s", a_task.primary_digest)
-    async with Flock(filepath=sample_zip):
+    lock_name = f'sample-data-lock-{a_task.primary_digest}'
+    lock = create_redis_lock(storage.redis, lock_name)
+    _LOGGER.info("waiting for %s", lock_name)
+    async with lock:
+        sample_raw = storage.sample_raw(a_task.primary_digest)
         if sample_raw.is_file():
             _LOGGER.info(
                 "extraction skipped for sample %s", a_task.primary_digest

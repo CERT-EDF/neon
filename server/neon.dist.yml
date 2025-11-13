@@ -3,6 +3,7 @@
 server:
   host: 127.0.0.1
   port: 8080
+  redis_url: redis://localhost:6379
   client_max_size: 104857600 # 100 MB
 # ------------------------------------------------------------------------------
 # neon storage configuration
