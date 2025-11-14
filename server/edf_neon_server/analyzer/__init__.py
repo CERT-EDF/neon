@@ -19,6 +19,7 @@ from signal import SIGINT, SIGTERM
 
 from edf_fusion.concept import AnalyzerInfo
 from edf_fusion.helper.logging import get_logger
+from edf_fusion.helper.redis import Redis, create_redis, close_redis
 from edf_fusion.server.config import (
     FusionAnalyzerConfig,
     FusionAnalyzerConfigType,
@@ -55,6 +56,7 @@ class Analyzer:
         Awaitable[bool],
     ]
     _event: Event = field(default_factory=Event)
+    _redis: Redis | None = None
     _queue: Queue = field(default_factory=Queue)
     _config: FusionAnalyzerConfig | None = None
     _storage: Storage | None = None
@@ -152,20 +154,25 @@ class Analyzer:
             return
         await self._storage.register_analyzer(self.info)
         _LOGGER.info("registered %s", self.info.name)
-        _LOGGER.info("analyses recovery in progress...")
-        recovered = await perform_analyses_recovery(
-            self.storage, self.info.name
-        )
-        _LOGGER.info("recovered %d analyses...", recovered)
-        coros = [self._producer()]
-        coros.extend([self._consumer() for _ in range(self.config.workers)])
-        await gather(*coros)
+        try:
+            _LOGGER.info("analyses recovery in progress...")
+            recovered = await perform_analyses_recovery(
+                self.storage, self.info.name
+            )
+            _LOGGER.info("recovered %d analyses...", recovered)
+            coros = [self._producer()]
+            coros.extend([self._consumer() for _ in range(self.config.workers)])
+            await gather(*coros)
+        finally:
+            await close_redis(self._redis)
+            self._redis = None
 
     def run(self):
         """Prepare analyzer and start analysis loop"""
         args = self._parse_args()
         try:
             config = NeonServerConfig.from_filepath(args.config)
+            self._redis = create_redis(config.server.redis_url)
             self._config = config.analyzer.get(self.info.name, self.config_cls)
         except:
             _LOGGER.exception("invalid configuration file: %s", args.config)
@@ -173,5 +180,5 @@ class Analyzer:
         if not self.config.enabled:
             _LOGGER.warning("%s analyzer is disabled.", self.info.name)
             return
-        self._storage = Storage(config=config.storage)
+        self._storage = Storage(redis=self._redis, config=config.storage)
         run(self._arun())

@@ -12,8 +12,8 @@ from uuid import UUID
 
 from edf_fusion.concept import AnalyzerInfo
 from edf_fusion.helper.filesystem import GUID_GLOB, iter_guid_items
-from edf_fusion.helper.flock import Flock
 from edf_fusion.helper.logging import get_logger
+from edf_fusion.helper.redis import Redis, create_redis_lock
 from edf_fusion.helper.streaming import stream_from_fobj
 from edf_fusion.helper.zip import create_zip
 from edf_fusion.server.storage import ConceptStorage, FusionStorage
@@ -125,6 +125,7 @@ class CaseStorage(ConceptStorage):
 class Storage(FusionStorage):
     """Neon Storage"""
 
+    redis: Redis | None
     config: NeonStorageConfig
 
     @cached_property
@@ -253,12 +254,18 @@ class Storage(FusionStorage):
         self, case_guid: UUID, name: str, fobj: BufferedIOBase
     ) -> Sample | None:
         """Create case sample"""
+        if not self.redis:
+            _LOGGER.error("cannot create sample without a redis instance!")
+            return None
         loop = get_running_loop()
         _LOGGER.info("sample autopsy for '%s' in %s", name, case_guid)
         sample = await loop.run_in_executor(None, _autopsy, name, fobj)
         sample_zip = self.sample_zip(sample.primary_digest)
         if not sample_zip.is_file():
-            async with Flock(filepath=sample_zip):
+            lock_name = f'sample-data-lock-{sample.primary_digest}'
+            lock = create_redis_lock(self.redis, lock_name)
+            _LOGGER.info("waiting for %s", lock_name)
+            async with lock:
                 _LOGGER.info("storing sample '%s' in %s", name, sample_zip)
                 await loop.run_in_executor(
                     None, _store, sample, sample_zip, fobj
@@ -273,9 +280,15 @@ class Storage(FusionStorage):
         self, case_guid: UUID, sample_guid: UUID, dct
     ) -> Sample | None:
         """Update case sample (MUTEX)"""
+        if not self.redis:
+            _LOGGER.error("cannot update sample without a redis instance!")
+            return None
         sample_storage = self.sample_storage(case_guid, sample_guid)
         metadata = sample_storage.metadata
-        async with Flock(filepath=metadata):
+        lock_name = f'sample-meta-lock-{sample_guid}'
+        lock = create_redis_lock(self.redis, lock_name)
+        _LOGGER.info("waiting for %s", lock_name)
+        async with lock:
             if not metadata.is_file():
                 _LOGGER.error("sample metadata not found: %s", metadata)
                 return None
