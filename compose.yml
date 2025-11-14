@@ -95,9 +95,13 @@ services:
       no_cache: true
     image: cert-edf/neon-be-die
     pull_policy: build
+    networks:
+      - private
     volumes:
       - /data/neon/conf:/conf
       - /data/neon/data:/data
+    depends_on:
+      - neon-redis
     environment:
       ROLE: analyzer
       FUSION_DEBUG: 0
