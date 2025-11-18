@@ -60,17 +60,6 @@ async def find_pending_analyses(
         yield primary_digest, analysis
 
 
-async def find_related_samples(
-    storage: Storage, primary_digest: str
-) -> Samples:
-    samples = []
-    async for case in storage.enumerate_cases():
-        async for sample in storage.enumerate_samples(case.guid):
-            if sample.primary_digest == primary_digest:
-                samples.append((case, sample))
-    return samples
-
-
 async def perform_analyses_recovery(storage: Storage, analyzer: str) -> int:
     """Perform analysis recovery when service was stopped while ananyzing"""
     recovered = 0

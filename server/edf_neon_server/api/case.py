@@ -19,6 +19,7 @@ from edf_fusion.helper.streaming import stream_from_file, stream_to_file
 from edf_fusion.server.case import (
     AttachContext,
     CreateContext,
+    DeleteContext,
     EnumerateContext,
     RetrieveContext,
     UpdateContext,
@@ -64,6 +65,15 @@ async def update_case_impl(ctx: UpdateContext) -> Case | None:
     return case
 
 
+async def delete_case_impl(ctx: DeleteContext) -> bool:
+    """Delete case"""
+    storage = get_fusion_storage(ctx.request)
+    fusion_evt_api = get_fusion_evt_api(ctx.request)
+    case = await storage.delete_case(ctx.case_guid)
+    await fusion_evt_api.notify(category='delete_case', case=case)
+    return case
+
+
 async def retrieve_case_impl(ctx: RetrieveContext) -> Case | None:
     """Retrieve case"""
     storage = get_fusion_storage(ctx.request)
@@ -78,38 +88,67 @@ async def enumerate_cases_impl(ctx: EnumerateContext) -> list[Case]:
 
 
 async def api_samples_get(request: Request):
-    """Retrieve one case samples"""
+    """Retrieve case samples"""
     case_guid = get_guid(request, 'case_guid')
+    if not case_guid:
+        return json_response(status=400, message="Invalid GUID")
     _, storage = await prologue(
         request, 'enumerate_samples', {'case_guid': case_guid}
     )
-    if not case_guid:
-        return json_response(status=400, message="Invalid GUID")
     samples = [sample async for sample in storage.enumerate_samples(case_guid)]
     return json_response(data=[sample.to_dict() for sample in samples])
 
 
 async def api_sample_get(request: Request):
-    """Retrieve case samples"""
+    """Retrieve case sample"""
     case_guid = get_guid(request, 'case_guid')
     sample_guid = get_guid(request, 'sample_guid')
+    if not case_guid or not sample_guid:
+        return json_response(status=400, message="Invalid GUID")
     _, storage = await prologue(
         request,
         'retrieve_sample',
         {'case_guid': case_guid, 'sample_guid': sample_guid},
     )
-    if not case_guid or not sample_guid:
-        return json_response(status=400, message="Invalid GUID")
     sample = await storage.retrieve_sample(case_guid, sample_guid)
     if not sample:
         return json_response(status=404, message="Sample not found")
     return json_response(data=sample.to_dict())
 
 
+async def api_sample_delete(request: Request):
+    """Delete case sample"""
+    case_guid = get_guid(request, 'case_guid')
+    sample_guid = get_guid(request, 'sample_guid')
+    fusion_evt_api = get_fusion_evt_api(request)
+    if not case_guid or not sample_guid:
+        return json_response(status=400, message="Invalid GUID")
+    _, storage = await prologue(
+        request,
+        'delete_sample',
+        {
+            'case_guid': case_guid,
+            'sample_guid': sample_guid,
+            'is_delete_op': True,
+        },
+    )
+    case = await storage.retrieve_case(case_guid)
+    sample = await storage.retrieve_sample(case_guid, sample_guid)
+    deleted = await storage.delete_sample(case_guid, sample_guid)
+    if not deleted:
+        return json_response(status=400, message="Not deleted")
+    await fusion_evt_api.notify(
+        category='delete_sample', case=case, ext={'sample': sample.to_dict()}
+    )
+    return json_response()
+
+
 async def api_sample_analyses_get(request: Request):
     """Enumerate case sample analyses"""
     case_guid = get_guid(request, 'case_guid')
     sample_guid = get_guid(request, 'sample_guid')
+    if not case_guid or not sample_guid:
+        return json_response(status=400, message="Invalid GUID")
     _, storage = await prologue(
         request,
         'enumerate_analyses',
@@ -136,6 +175,8 @@ async def api_sample_analysis_log_get(request: Request) -> StreamResponse:
     case_guid = get_guid(request, 'case_guid')
     sample_guid = get_guid(request, 'sample_guid')
     analyzer = request.match_info['analyzer']
+    if not case_guid or not sample_guid or not analyzer:
+        return json_response(status=400, message="Bad request")
     _, storage = await prologue(
         request,
         'analysis_log',
@@ -145,8 +186,6 @@ async def api_sample_analysis_log_get(request: Request) -> StreamResponse:
             'analyzer': analyzer,
         },
     )
-    if not case_guid or not sample_guid or not analyzer:
-        return json_response(status=400, message="Bad request")
     sample = await storage.retrieve_sample(case_guid, sample_guid)
     if not sample:
         return json_response(status=404, message="Sample not found")
@@ -169,6 +208,8 @@ async def api_sample_analysis_download_get(request: Request):
     sample_guid = get_guid(request, 'sample_guid')
     fusion_dl_api = get_fusion_dl_api(request)
     analyzer = request.match_info['analyzer']
+    if not case_guid or not sample_guid or not analyzer:
+        return json_response(status=400, message="Bad request")
     _, storage = await prologue(
         request,
         'analysis_download',
@@ -178,8 +219,6 @@ async def api_sample_analysis_download_get(request: Request):
             'analyzer': analyzer,
         },
     )
-    if not case_guid or not sample_guid or not analyzer:
-        return json_response(status=400, message="Bad request")
     sample = await storage.retrieve_sample(case_guid, sample_guid)
     if not sample:
         return json_response(status=404, message="Sample not found")
@@ -202,13 +241,13 @@ async def api_sample_download_get(request: Request):
     case_guid = get_guid(request, 'case_guid')
     sample_guid = get_guid(request, 'sample_guid')
     fusion_dl_api = get_fusion_dl_api(request)
+    if not case_guid or not sample_guid:
+        return json_response(status=400, message="Invalid GUID")
     _, storage = await prologue(
         request,
         'sample_download',
         {'case_guid': case_guid, 'sample_guid': sample_guid},
     )
-    if not case_guid or not sample_guid:
-        return json_response(status=400, message="Invalid GUID")
     sample = await storage.retrieve_sample(case_guid, sample_guid)
     if not sample:
         return json_response(status=400, message="Sample not found")
@@ -255,6 +294,8 @@ async def api_sample_post(request: Request):
     """Add sample to case"""
     case_guid = get_guid(request, 'case_guid')
     fusion_evt_api = get_fusion_evt_api(request)
+    if not case_guid:
+        return json_response(status=400, message="Invalid GUID")
     _, storage = await prologue(
         request,
         'create_sample',
@@ -305,6 +346,8 @@ async def api_sample_put(request: Request):
     case_guid = get_guid(request, 'case_guid')
     sample_guid = get_guid(request, 'sample_guid')
     fusion_evt_api = get_fusion_evt_api(request)
+    if not case_guid or not sample_guid:
+        return json_response(status=400, message="Invalid GUID")
     _, storage = await prologue(
         request,
         'update_sample',
@@ -314,8 +357,6 @@ async def api_sample_put(request: Request):
             'case_open_check': True,
         },
     )
-    if not case_guid or not sample_guid:
-        return json_response(status=400, message="Invalid GUID")
     body = await get_json_body(request)
     sample = await storage.update_sample(case_guid, sample_guid, body)
     if not sample:
