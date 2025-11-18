@@ -19,11 +19,13 @@ from signal import SIGINT, SIGTERM
 
 from edf_fusion.concept import AnalyzerInfo
 from edf_fusion.helper.logging import get_logger
+from edf_fusion.helper.notifier import FusionNotifier, create_notifier_session
 from edf_fusion.helper.redis import Redis, close_redis, create_redis
 from edf_fusion.server.config import (
     FusionAnalyzerConfig,
     FusionAnalyzerConfigType,
 )
+from edf_neon_core.concept import Event as NeonEvent
 from edf_neon_core.concept import Status
 
 from ..config import NeonServerConfig
@@ -33,7 +35,6 @@ from .helper import (
     extract_sample,
     find_pending_analyses,
     perform_analyses_recovery,
-    set_analysis_status,
 )
 from .task import AnalyzerTask
 
@@ -55,15 +56,15 @@ class Analyzer:
         Awaitable[bool],
     ]
     _event: Event = field(default_factory=Event)
-    _redis: Redis | None = None
     _queue: Queue = field(default_factory=Queue)
-    _config: FusionAnalyzerConfig | None = None
+    _config: NeonServerConfig | None = None
     _storage: Storage | None = None
+    _notifier: FusionNotifier | None = None
 
-    @property
+    @cached_property
     def config(self) -> FusionAnalyzerConfig:
         """Analyzer configuration"""
-        return self._config
+        return self._config.analyzer.get(self.info.name, self.config_cls)
 
     @property
     def storage(self) -> Storage:
@@ -85,15 +86,35 @@ class Analyzer:
         )
         return parser.parse_args()
 
-    async def _startup(self, a_task: AnalyzerTask) -> bool:
-        await set_analysis_status(self.storage, a_task, Status.EXTRACTING)
+    async def update_analysis_status(
+        self, a_task: AnalyzerTask, status: Status
+    ):
+        """Set analysis status"""
+        await self.storage.update_analysis(
+            a_task.primary_digest,
+            a_task.analysis.analyzer,
+            {'status': status.value},
+        )
+        for case, sample in a_task.samples:
+            event = NeonEvent(
+                category=f'analysis_{status.value}',
+                case=case,
+                ext={
+                    'sample': sample.to_dict(),
+                    'analysis': a_task.analysis.to_dict(),
+                },
+            )
+            await self._notifier.notify(event)
+
+    async def _task_startup(self, a_task: AnalyzerTask) -> bool:
+        await self.update_analysis_status(a_task, Status.EXTRACTING)
         extracted = await extract_sample(self.storage, a_task)
         if not extracted:
             raise AnalyzerError("extracted data is not available")
 
-    async def _cleanup(self, a_task: AnalyzerTask, success: bool):
+    async def _task_cleanup(self, a_task: AnalyzerTask, success: bool):
         status = Status.SUCCESS if success else Status.FAILURE
-        await set_analysis_status(self.storage, a_task, status)
+        await self.update_analysis_status(a_task, status)
 
     async def _consumer(self):
         while not self._event.is_set():
@@ -108,17 +129,15 @@ class Analyzer:
             )
             success = False
             try:
-                await self._startup(a_task)
-                await set_analysis_status(
-                    self.storage, a_task, Status.PROCESSING
-                )
+                await self._task_startup(a_task)
+                await self.update_analysis_status(a_task, Status.PROCESSING)
                 success = await self.process_impl(
                     self.info, self._config, self.storage, a_task
                 )
             except AnalyzerError as exc:
                 _LOGGER.error("analyzer error: %s", exc)
             finally:
-                await self._cleanup(a_task, success)
+                await self._task_cleanup(a_task, success)
 
     async def _producer(self):
         _LOGGER.info("producer is starting...")
@@ -140,49 +159,68 @@ class Analyzer:
                 )
                 _LOGGER.info("producer queueing analysis %s", analysis.guid)
                 await self._queue.put(a_task)
-                await set_analysis_status(self.storage, a_task, Status.QUEUED)
+                await self.update_analysis_status(a_task, Status.QUEUED)
             try:
                 await wait_for(self._event.wait(), 30)
             except TimeoutError:
                 continue
         _LOGGER.info("producer shutdown")
 
-    async def _arun(self):
+    async def _register_analyzer(self) -> bool:
+        _LOGGER.info("registering analyzer %s", self.info.name)
+        await self._storage.register_analyzer(self.info)
+        _LOGGER.info("registered %s", self.info.name)
+
+    async def _recover_incomplete_analyses(self):
+        _LOGGER.info("analyses recovery in progress...")
+        recovered = await perform_analyses_recovery(
+            self.storage, self.info.name
+        )
+        _LOGGER.info("recovered %d analyses...", recovered)
+
+    async def _produce_and_consume(self):
+        coros = [self._producer()]
+        coros.extend([self._consumer() for _ in range(self.config.workers)])
+        await gather(*coros)
+
+    async def _run_async(self):
         loop = get_running_loop()
         for sig in (SIGINT, SIGTERM):
             loop.add_signal_handler(sig, self._shutdown)
-        _LOGGER.info("registering analyzer %s", self.info.name)
-        if not check_analyzer_info(self.info):
-            return
-        await self._storage.register_analyzer(self.info)
-        _LOGGER.info("registered %s", self.info.name)
-        try:
-            _LOGGER.info("analyses recovery in progress...")
-            recovered = await perform_analyses_recovery(
-                self.storage, self.info.name
+        redis = create_redis(self._config.server.redis_url)
+        session = create_notifier_session(
+            self._config.event_api.api_key, self._config.event_api.timeout
+        )
+        self._storage = Storage(redis=redis, config=self._config.storage)
+        async with session:
+            self._notifier = FusionNotifier(
+                redis=redis,
+                session=session,
+                api_ssl=self._config.event_api.api_ssl,
+                webhooks=[self.config.webhook],
             )
-            _LOGGER.info("recovered %d analyses...", recovered)
-            coros = [self._producer()]
-            coros.extend(
-                [self._consumer() for _ in range(self.config.workers)]
-            )
-            await gather(*coros)
-        finally:
-            await close_redis(self._redis)
-            self._redis = None
+            await self._register_analyzer()
+            await self._recover_incomplete_analyses()
+            try:
+                await self._produce_and_consume()
+            finally:
+                self._notifier = None
+                await close_redis(redis)
 
     def run(self):
         """Prepare analyzer and start analysis loop"""
         args = self._parse_args()
         try:
-            config = NeonServerConfig.from_filepath(args.config)
-            self._redis = create_redis(config.server.redis_url)
-            self._config = config.analyzer.get(self.info.name, self.config_cls)
+            self._config = NeonServerConfig.from_filepath(args.config)
         except:
             _LOGGER.exception("invalid configuration file: %s", args.config)
             return
+        # early return if not enabled
         if not self.config.enabled:
             _LOGGER.warning("%s analyzer is disabled.", self.info.name)
             return
-        self._storage = Storage(redis=self._redis, config=config.storage)
-        run(self._arun())
+        # analyzer info compliance check
+        if not check_analyzer_info(self.info):
+            return
+        # start analyzer async workflow
+        run(self._run_async())

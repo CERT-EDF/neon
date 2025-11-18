@@ -30,17 +30,6 @@ def check_analyzer_info(info: AnalyzerInfo) -> bool:
     return True
 
 
-async def set_analysis_status(
-    storage: Storage, analyzer_task: AnalyzerTask, status: Status
-):
-    """Set analysis status"""
-    await storage.update_analysis(
-        analyzer_task.primary_digest,
-        analyzer_task.analysis.analyzer,
-        {'status': status.value},
-    )
-
-
 async def find_analyses(
     storage: Storage, analyzer: str
 ) -> AsyncIterator[str, Analysis]:
@@ -71,7 +60,7 @@ async def perform_analyses_recovery(storage: Storage, analyzer: str) -> int:
         await storage.update_analysis(
             primary_digest,
             analyzer,
-            {'status': Status.PENDING.value},
+            {"status": Status.PENDING.value},
         )
         recovered += 1
     return recovered
