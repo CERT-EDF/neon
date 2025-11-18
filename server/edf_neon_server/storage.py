@@ -233,6 +233,11 @@ class Storage(FusionStorage):
         case.to_filepath(metadata)
         return case
 
+    async def delete_case(self, case_guid: UUID) -> bool:
+        case_storage = self.case_storage(case_guid)
+        case_storage.remove()
+        return True
+
     async def retrieve_case(self, case_guid: UUID) -> Case | None:
         case_storage = self.case_storage(case_guid)
         metadata = case_storage.metadata
@@ -297,6 +302,34 @@ class Storage(FusionStorage):
             sample.to_filepath(metadata)
             return sample
 
+    async def delete_sample(self, case_guid: UUID, sample_guid: UUID) -> bool:
+        """Delete case sample"""
+        sample = await self.retrieve_sample(case_guid, sample_guid)
+        # delete metadata related to the sample
+        sample_storage = await self.sample_storage(case_guid, sample_guid)
+        sample_storage.remove()
+        samples = [
+            item
+            async for item in self.enumerate_related_samples(
+                sample.primary_digest
+            )
+        ]
+        # if no more reference to sample data
+        if not samples:
+            # delete sample data
+            sample_zip = self.sample_zip(sample.primary_digest)
+            sample_zip.unlink(missing_ok=True)
+            sample_raw = self.sample_raw(sample.primary_digest)
+            sample_raw.unlink(missing_ok=True)
+            # remove related analyses
+            async for analysis in self.enumerate_analyses(
+                sample.primary_digest
+            ):
+                await self.delete_analysis(
+                    sample.primary_digest, analysis.analyzer
+                )
+        return True
+
     async def retrieve_sample(
         self, case_guid: UUID, sample_guid: UUID
     ) -> Sample | None:
@@ -318,6 +351,15 @@ class Storage(FusionStorage):
             if not metadata.is_file():
                 continue
             yield Sample.from_filepath(metadata)
+
+    async def enumerate_related_samples(
+        self, primary_digest: str
+    ) -> AsyncIterator[Case, Sample]:
+        """Enumerate related samples"""
+        async for case in self.enumerate_cases():
+            async for sample in self.enumerate_samples(case.guid):
+                if sample.primary_digest == primary_digest:
+                    yield case, sample
 
     async def enumerate_primary_digests(self) -> AsyncIterator[str]:
         """Enumerate samples primary digests"""
@@ -355,6 +397,14 @@ class Storage(FusionStorage):
         analysis.update(dct)
         analysis.to_filepath(metadata)
         return analysis
+
+    async def delete_analysis(
+        self, primary_digest: str, analyzer: str
+    ) -> bool:
+        """Delete analysis"""
+        analysis_storage = self.analysis_storage(primary_digest, analyzer)
+        analysis_storage.remove()
+        return True
 
     async def retrieve_analysis_log(
         self, primary_digest: str, analyzer: str

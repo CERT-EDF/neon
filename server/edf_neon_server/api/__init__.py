@@ -1,12 +1,13 @@
 """Neon API module"""
 
-from aiohttp.web import Application, get, post, put
+from aiohttp.web import Application, delete, get, post, put
 from edf_fusion.helper.logging import get_logger
 
 from .case import (
     api_sample_analyses_get,
     api_sample_analysis_download_get,
     api_sample_analysis_log_get,
+    api_sample_delete,
     api_sample_download_get,
     api_sample_get,
     api_sample_post,
@@ -14,6 +15,7 @@ from .case import (
     api_samples_get,
     attach_case_impl,
     create_case_impl,
+    delete_case_impl,
     enumerate_cases_impl,
     retrieve_case_impl,
     update_case_impl,
@@ -33,6 +35,10 @@ def setup_api(webapp: Application):
             put(
                 '/api/case/{case_guid}/sample/{sample_guid}',
                 api_sample_put,
+            ),
+            delete(
+                '/api/case/{case_guid}/sample/{sample_guid}',
+                api_sample_delete,
             ),
             get(
                 '/api/case/{case_guid}/sample/{sample_guid}',

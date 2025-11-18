@@ -19,7 +19,7 @@ from signal import SIGINT, SIGTERM
 
 from edf_fusion.concept import AnalyzerInfo
 from edf_fusion.helper.logging import get_logger
-from edf_fusion.helper.redis import Redis, create_redis, close_redis
+from edf_fusion.helper.redis import Redis, close_redis, create_redis
 from edf_fusion.server.config import (
     FusionAnalyzerConfig,
     FusionAnalyzerConfigType,
@@ -32,7 +32,6 @@ from .helper import (
     check_analyzer_info,
     extract_sample,
     find_pending_analyses,
-    find_related_samples,
     perform_analyses_recovery,
     set_analysis_status,
 )
@@ -128,9 +127,12 @@ class Analyzer:
             async for primary_digest, analysis in find_pending_analyses(
                 self.storage, self.info.name
             ):
-                samples = await find_related_samples(
-                    self.storage, primary_digest
-                )
+                samples = [
+                    item
+                    async for item in self.storage.enumerate_related_samples(
+                        primary_digest
+                    )
+                ]
                 a_task = AnalyzerTask(
                     primary_digest=primary_digest,
                     analysis=analysis,
@@ -161,7 +163,9 @@ class Analyzer:
             )
             _LOGGER.info("recovered %d analyses...", recovered)
             coros = [self._producer()]
-            coros.extend([self._consumer() for _ in range(self.config.workers)])
+            coros.extend(
+                [self._consumer() for _ in range(self.config.workers)]
+            )
             await gather(*coros)
         finally:
             await close_redis(self._redis)
