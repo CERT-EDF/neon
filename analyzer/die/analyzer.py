@@ -7,7 +7,6 @@ from edf_fusion.concept import AnalyzerInfo
 from edf_fusion.helper.logging import get_logger
 from edf_fusion.helper.subprocess import create_subprocess_and_wait
 from edf_fusion.server.config import FusionAnalyzerConfig
-from edf_neon_core.concept import OperatingSystem
 from edf_neon_server.analyzer import Analyzer, AnalyzerTask
 from edf_neon_server.storage import Storage
 

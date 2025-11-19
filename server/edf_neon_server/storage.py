@@ -306,7 +306,7 @@ class Storage(FusionStorage):
         """Delete case sample"""
         sample = await self.retrieve_sample(case_guid, sample_guid)
         # delete metadata related to the sample
-        sample_storage = await self.sample_storage(case_guid, sample_guid)
+        sample_storage = self.sample_storage(case_guid, sample_guid)
         sample_storage.remove()
         samples = [
             item

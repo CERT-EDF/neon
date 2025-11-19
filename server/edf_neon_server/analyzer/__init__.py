@@ -132,7 +132,7 @@ class Analyzer:
                 await self._task_startup(a_task)
                 await self.update_analysis_status(a_task, Status.PROCESSING)
                 success = await self.process_impl(
-                    self.info, self._config, self.storage, a_task
+                    self.info, self.config, self.storage, a_task
                 )
             except AnalyzerError as exc:
                 _LOGGER.error("analyzer error: %s", exc)
@@ -197,7 +197,7 @@ class Analyzer:
                 redis=redis,
                 session=session,
                 api_ssl=self._config.event_api.api_ssl,
-                webhooks=[self.config.webhook],
+                webhooks=[self._config.event_api.webhook],
             )
             await self._register_analyzer()
             await self._recover_incomplete_analyses()

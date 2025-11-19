@@ -69,9 +69,11 @@ async def delete_case_impl(ctx: DeleteContext) -> bool:
     """Delete case"""
     storage = get_fusion_storage(ctx.request)
     fusion_evt_api = get_fusion_evt_api(ctx.request)
-    case = await storage.delete_case(ctx.case_guid)
-    await fusion_evt_api.notify(category='delete_case', case=case)
-    return case
+    case = await storage.retrieve_case(ctx.case_guid)
+    deleted = await storage.delete_case(ctx.case_guid)
+    if deleted:
+        await fusion_evt_api.notify(category='delete_case', case=case)
+    return deleted
 
 
 async def retrieve_case_impl(ctx: RetrieveContext) -> Case | None:

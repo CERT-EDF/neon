@@ -7,7 +7,10 @@ from uuid import UUID
 from aiohttp import FormData
 from edf_fusion.client import FusionClient
 from edf_fusion.concept import AnalyzerInfo, PendingDownloadKey
+from edf_fusion.helper.logging import get_logger
 from edf_neon_core.concept import Analysis, Sample
+
+_LOGGER = get_logger('client', root='neon')
 
 
 @dataclass(kw_only=True)
@@ -21,10 +24,11 @@ class NeonClient:
         endpoint = f'/api/case/{case_guid}/samples'
         return await self.fusion_client.get(endpoint, concept_cls=Sample)
 
-    async def create_sample(
+    async def create_samples(
         self, case_guid: UUID, secret: bytes, filepath: Path
     ) -> list[Sample] | None:
         """Create sample"""
+        _LOGGER.info("uploading archive %s in case %s", filepath, case_guid)
         endpoint = f'/api/case/{case_guid}/sample'
         data = FormData()
         data.add_field('secret', secret)
@@ -37,10 +41,17 @@ class NeonClient:
         self, case_guid: UUID, sample: Sample
     ) -> Sample | None:
         """Update sample"""
+        _LOGGER.info("updating sample %s in case %s", sample.guid, case_guid)
         endpoint = f'/api/case/{case_guid}/sample/{sample.guid}'
         return await self.fusion_client.put(
             endpoint, sample, concept_cls=Sample
         )
+
+    async def delete_sample(self, case_guid: UUID, sample_guid: UUID) -> bool:
+        """Delete sample"""
+        _LOGGER.info("deleting sample %s in case %s", sample_guid, case_guid)
+        endpoint = f'/api/case/{case_guid}/sample/{sample_guid}'
+        return await self.fusion_client.delete(endpoint)
 
     async def retrieve_sample(
         self, case_guid: UUID, sample_guid: UUID
@@ -53,6 +64,9 @@ class NeonClient:
         self, case_guid: UUID, sample_guid: UUID
     ) -> PendingDownloadKey | None:
         """Download sample"""
+        _LOGGER.info(
+            "downloading sample %s in case %s", sample_guid, case_guid
+        )
         endpoint = f'/api/case/{case_guid}/sample/{sample_guid}/download'
         return await self.fusion_client.get(
             endpoint, concept_cls=PendingDownloadKey
@@ -65,15 +79,26 @@ class NeonClient:
         endpoint = f'/api/case/{case_guid}/sample/{sample_guid}/analyses'
         return await self.fusion_client.get(endpoint, concept_cls=Analysis)
 
-    async def retrieve_analysis_data(
-        self,
-        case_guid: UUID,
-        sample_guid: UUID,
-        analyzer: str,
-        output: Path,
+    async def download_analysis(
+        self, case_guid: UUID, sample_guid: UUID, analyzer: str
+    ) -> PendingDownloadKey | None:
+        """Download analysis"""
+        _LOGGER.info(
+            "downloading analysis %s for sample %s in case %s",
+            analyzer,
+            sample_guid,
+            case_guid,
+        )
+        endpoint = f'/api/case/{case_guid}/sample/{sample_guid}/analysis/{analyzer}/download'
+        return await self.fusion_client.get(
+            endpoint, concept_cls=PendingDownloadKey
+        )
+
+    async def retrieve_analysis_log(
+        self, case_guid: UUID, sample_guid: UUID, analyzer: str, output: Path
     ) -> Path | None:
         """Retrieve sample analysis"""
-        endpoint = f'/api/case/{case_guid}/sample/{sample_guid}/analysis/{analyzer}/data'
+        endpoint = f'/api/case/{case_guid}/sample/{sample_guid}/analysis/{analyzer}/log'
         return await self.fusion_client.download(endpoint, output)
 
     async def retrieve_analyzers(self) -> list[AnalyzerInfo]:
