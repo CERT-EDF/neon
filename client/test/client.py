@@ -10,39 +10,41 @@ from edf_fusion.client import (
     FusionCaseAPIClient,
     FusionClient,
     FusionClientConfig,
+    FusionConstantAPIClient,
     FusionDownloadAPIClient,
     FusionInfoAPIClient,
     create_session,
 )
 from edf_fusion.helper.logging import get_logger
-from edf_neon_core.concept import Case
+from edf_neon_core.concept import Case, Constant, Sample
 from yarl import URL
 
 from edf_neon_client import NeonClient
 
 _LOGGER = get_logger('client', root='test')
-_TMP_DIRECTORY = Path('/tmp')
+_TEST_FILE = Path(__file__).parent / 'test.zip'
+_TEST_SECRET = b'test'
+_TEST_OUTPUT_DIR = Path('/tmp')
 
 
-async def _playbook(fusion_client: FusionClient):
+async def _test_retrieve_info(fusion_client: FusionClient):
     fusion_info_api_client = FusionInfoAPIClient(fusion_client=fusion_client)
-    fusion_case_api_client = FusionCaseAPIClient(
-        case_cls=Case, fusion_client=fusion_client
-    )
-    fusion_download_api_client = FusionDownloadAPIClient(
-        fusion_client=fusion_client
-    )
-    neon_client = NeonClient(fusion_client=fusion_client)
-    # retrieve server info
     info = await fusion_info_api_client.info()
-    _LOGGER.info("%s", info)
+    _LOGGER.info("retrieved info: %s", info)
+
+
+async def _test_retrieve_constant(fusion_client: FusionClient):
+    fusion_constant_api_client = FusionConstantAPIClient(
+        constant_cls=Constant, fusion_client=fusion_client
+    )
+    constant = await fusion_constant_api_client.constant()
+    _LOGGER.info("retrieved constant: %s", constant)
+
+
+async def _test_case_lifecycle(fusion_case_api_client: FusionCaseAPIClient):
     # create case
     case = await fusion_case_api_client.create_case(
-        Case(
-            tsid=None,
-            name='test case',
-            description='test description',
-        )
+        Case(tsid=None, name='T', description='D', acs={'test'})
     )
     _LOGGER.info("created case: %s", case)
     # update case
@@ -55,14 +57,27 @@ async def _playbook(fusion_client: FusionClient):
     # enumerate cases
     cases = await fusion_case_api_client.enumerate_cases()
     _LOGGER.info("enumerated cases: %s", cases)
+    # delete case
+    deleted = await fusion_case_api_client.delete_case(case.guid)
+    _LOGGER.info("case deleted: %s", deleted)
+    # enumerate cases
+    cases = await fusion_case_api_client.enumerate_cases()
+    _LOGGER.info("enumerated cases: %s", cases)
+
+
+async def _test_sample_lifecycle(
+    neon_client: NeonClient,
+    fusion_download_api_client: FusionDownloadAPIClient,
+    case: Case,
+):
     # create sample
-    samples = await neon_client.create_sample(
-        case.guid, b'test', Path('./test/test.zip')
+    samples = await neon_client.create_samples(
+        case.guid, _TEST_SECRET, _TEST_FILE
     )
     _LOGGER.info("created samples: %s", samples)
     # update sample
     sample = samples[0]
-    sample.report = 'test sample report'
+    sample.report = 'R'
     sample = await neon_client.update_sample(case.guid, sample)
     _LOGGER.info("updated sample: %s", sample)
     # retrieve sample
@@ -73,10 +88,18 @@ async def _playbook(fusion_client: FusionClient):
     _LOGGER.info("retrieved samples (case): %s", samples)
     # download sample
     pdk = await neon_client.download_sample(case.guid, sample.guid)
-    _LOGGER.info("pdk: %s", pdk)
-    output = await fusion_download_api_client.download(pdk, _TMP_DIRECTORY)
+    output = await fusion_download_api_client.download(pdk, _TEST_OUTPUT_DIR)
     _LOGGER.info("output: %s", output)
-    # wait for analysis to be ready
+    # delete sample
+    deleted = await neon_client.delete_sample(case.guid, sample.guid)
+    _LOGGER.info("sample deleted: %s", deleted)
+
+
+async def _wait_for_analyses(
+    neon_client: NeonClient,
+    case: Case,
+    sample: Sample,
+):
     while True:
         analyses = await neon_client.retrieve_analyses(case.guid, sample.guid)
         _LOGGER.info("retrieved analyses: %s", analyses)
@@ -87,21 +110,72 @@ async def _playbook(fusion_client: FusionClient):
             break
         _LOGGER.info("waiting for analysis result to complete")
         await sleep(5)
+
+
+async def _test_analyzers(
+    neon_client: NeonClient,
+    fusion_download_api_client: FusionDownloadAPIClient,
+    case: Case,
+    sample: Sample,
+):
+    # wait for analysis to be ready
+    await _wait_for_analyses(neon_client, case, sample)
     # retrieve analyzers
     analyzers = await neon_client.retrieve_analyzers()
     _LOGGER.info("retrieved analyzers: %s", analyzers)
     for analyzer in analyzers:
-        # download analysis result
-        output = await neon_client.retrieve_analysis_data(
-            case.guid, sample.guid, analyzer.name, _TMP_DIRECTORY
+        # retrieve analysis log
+        output = await neon_client.retrieve_analysis_log(
+            case.guid, sample.guid, analyzer.name, _TEST_OUTPUT_DIR
         )
-        _LOGGER.info("downloaded analysis result: %s", output)
+        _LOGGER.info("retrieved analysis log: %s", output)
+        # download analysis data
+        pdk = await neon_client.download_analysis(
+            case.guid, sample.guid, analyzer.name
+        )
+        if not pdk:
+            continue
+        output = await fusion_download_api_client.download(
+            pdk, _TEST_OUTPUT_DIR
+        )
+        _LOGGER.info("downloaded analysis data: %s", output)
+
+
+async def _playbook(fusion_client: FusionClient):
+    fusion_case_api_client = FusionCaseAPIClient(
+        case_cls=Case, fusion_client=fusion_client
+    )
+    fusion_download_api_client = FusionDownloadAPIClient(
+        fusion_client=fusion_client
+    )
+    neon_client = NeonClient(fusion_client=fusion_client)
+    await _test_retrieve_info(fusion_client)
+    await _test_retrieve_constant(fusion_client)
+    await _test_case_lifecycle(fusion_case_api_client)
+    case = await fusion_case_api_client.create_case(
+        Case(tsid=None, name='T', description='D', acs={'test'})
+    )
+    _LOGGER.info("created case: %s", case)
+    input("execution paused, press enter to continue!")
+    await _test_sample_lifecycle(neon_client, fusion_download_api_client, case)
+    samples = await neon_client.create_samples(
+        case.guid, _TEST_SECRET, _TEST_FILE
+    )
+    sample = samples[0]
+    await _test_analyzers(
+        neon_client, fusion_download_api_client, case, sample
+    )
+    await neon_client.delete_sample(case.guid, sample.guid)
+    await fusion_case_api_client.delete_case(case.guid)
 
 
 def _parse_args():
     parser = ArgumentParser()
     parser.add_argument(
-        '--port', '-p', type=int, default=10000, help="Server port"
+        '--api-url',
+        type=URL,
+        default=URL('http://neon.domain.lan/'),
+        help="API URL",
     )
     return parser.parse_args()
 
@@ -109,7 +183,7 @@ def _parse_args():
 async def app():
     """Application entrypoint"""
     args = _parse_args()
-    config = FusionClientConfig(api_url=URL(f'http://127.0.0.1:{args.port}/'))
+    config = FusionClientConfig(api_url=args.api_url)
     session = create_session(config, unsafe=True)
     async with session:
         fusion_client = FusionClient(config=config, session=session)
