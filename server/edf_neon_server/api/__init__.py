@@ -21,6 +21,7 @@ from .case import (
     update_case_impl,
 )
 from .config import api_analyzers_get
+from .search import api_search_digest_get
 
 _LOGGER = get_logger('server.api', root='neon')
 
@@ -61,6 +62,7 @@ def setup_api(webapp: Application):
                 api_sample_analysis_download_get,
             ),
             get('/api/config/analyzers', api_analyzers_get),
+            get('/api/search/digest/{primary_digest}', api_search_digest_get),
         ]
     )
     _LOGGER.info("neon api installed.")
