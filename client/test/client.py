@@ -112,6 +112,11 @@ async def _wait_for_analyses(
         await sleep(5)
 
 
+async def _test_search(neon_client: NeonClient, sample: Sample):
+    digest_hits = await neon_client.search_digest(sample.primary_digest)
+    _LOGGER.info("digest hits: %s", digest_hits)
+
+
 async def _test_analyzers(
     neon_client: NeonClient,
     fusion_download_api_client: FusionDownloadAPIClient,
@@ -162,6 +167,7 @@ async def _playbook(fusion_client: FusionClient):
         case.guid, _TEST_SECRET, _TEST_FILE
     )
     sample = samples[0]
+    await _test_search(neon_client, sample)
     await _test_analyzers(
         neon_client, fusion_download_api_client, case, sample
     )

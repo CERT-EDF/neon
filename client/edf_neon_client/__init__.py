@@ -8,7 +8,7 @@ from aiohttp import FormData
 from edf_fusion.client import FusionClient
 from edf_fusion.concept import AnalyzerInfo, PendingDownloadKey
 from edf_fusion.helper.logging import get_logger
-from edf_neon_core.concept import Analysis, Sample
+from edf_neon_core.concept import Analysis, DigestHits, Sample
 
 _LOGGER = get_logger('client', root='neon')
 
@@ -105,3 +105,8 @@ class NeonClient:
         """Retrieve analyzers"""
         endpoint = '/api/config/analyzers'
         return await self.fusion_client.get(endpoint, concept_cls=AnalyzerInfo)
+
+    async def search_digest(self, primary_digest: str) -> DigestHits | None:
+        """Search given digest"""
+        endpoint = f'/api/search/digest/{primary_digest}'
+        return await self.fusion_client.get(endpoint, concept_cls=DigestHits)

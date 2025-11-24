@@ -3,6 +3,7 @@
 from .analysis import Analysis, Status
 from .case import Case
 from .constant import Constant
+from .digest_hit import CaseHit, DigestHits
 from .digests import Digests
 from .event import Event
 from .indicator import Indicator, IndicatorNature
