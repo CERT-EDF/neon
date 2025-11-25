@@ -461,6 +461,7 @@ export class CaseComponent {
   }
 
   deleteSample(sample: CaseSampleMetadata) {
+    const confirm_text = sample.name;
     const modal = this.dialogService.open(DeleteConfirmModalComponent, {
       header: 'Confirm to delete',
       modal: true,
@@ -468,11 +469,11 @@ export class CaseComponent {
       focusOnShow: false,
       dismissableMask: true,
       breakpoints: { '640px': '90vw' },
-      data: sample.name,
+      data: confirm_text,
     });
 
     modal.onClose.pipe(take(1)).subscribe((confirmed: string | null) => {
-      if (!confirmed) return;
+      if (!confirmed || confirm_text != confirmed) return;
       this.apiService.deleteSample(this.caseMeta!.guid, sample.guid).pipe(take(1)).subscribe({
         next: () => {
           const sampleIndex = this.caseSamples.findIndex((s) => s.guid === sample.guid);
