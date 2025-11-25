@@ -129,6 +129,10 @@ export class ApiService {
       .pipe(map((resp) => resp.data));
   }
 
+  deleteCase(caseGuid: string): Observable<any> {
+    return this.http.delete<any>(`${this.apiBaseUrl}/case/${caseGuid}`);
+  }
+
   getCaseSamples(caseGuid: string): Observable<CaseSampleMetadata[]> {
     return this.http.get<APIResponse<CaseSampleMetadata[]>>(`${this.apiBaseUrl}/case/${caseGuid}/samples`).pipe(
       map((resp) => resp.data || []),
