@@ -362,34 +362,6 @@ export class CaseComponent {
 
   constructCaseMenu(ev: any) {
     if (!this.caseMeta) return;
-
-    const items: MenuItem[] = [
-      {
-        label: 'Generate Report',
-        icon: 'pi pi-file-export',
-        iconClass: 'text-blue-500!',
-        command: () => this.generateReport(),
-      },
-      {
-        label: 'Copy GUID',
-        icon: 'pi pi-tag',
-        command: () => {
-          try {
-            navigator.clipboard.writeText(this.caseMeta!.guid);
-          } catch {
-            console.error('Clipboard not available');
-            this.utilsService.toast('error', 'Error', 'Clipboard not available');
-          }
-        },
-      },
-      {
-        label: 'Edit',
-        icon: 'pi pi-pencil',
-        disabled: !!this.caseMeta.closed,
-        command: () => this.openEditCaseModal(),
-      },
-    ];
-
     const closeOrReopenItem = this.caseMeta.closed
       ? {
           label: 'Reopen',
@@ -416,7 +388,41 @@ export class CaseComponent {
               }),
         };
 
-    this.caseMenuItems = [...items, closeOrReopenItem];
+    const items: MenuItem[] = [
+      {
+        label: 'Generate Report',
+        icon: 'pi pi-file-export',
+        iconClass: 'text-blue-500!',
+        command: () => this.generateReport(),
+      },
+      {
+        label: 'Copy GUID',
+        icon: 'pi pi-tag',
+        command: () => {
+          try {
+            navigator.clipboard.writeText(this.caseMeta!.guid);
+          } catch {
+            console.error('Clipboard not available');
+            this.utilsService.toast('error', 'Error', 'Clipboard not available');
+          }
+        },
+      },
+      {
+        label: 'Edit',
+        icon: 'pi pi-pencil',
+        disabled: !!this.caseMeta.closed,
+        command: () => this.openEditCaseModal(),
+      },
+      closeOrReopenItem,
+      {
+        label: 'Delete',
+        icon: 'pi pi-trash',
+        iconClass: 'text-red-500!',
+        command: () => this.deleteCase(),
+      },
+    ];
+
+    this.caseMenuItems = [...items];
     this.caseMenu.toggle(ev);
   }
 
@@ -485,6 +491,32 @@ export class CaseComponent {
             if (displayedIndex > -1) this.caseSamples.splice(displayedIndex, 1);
           },
           error: () => this.utilsService.toast('error', 'Error', 'An error occured, sample not deleted'),
+        });
+    });
+  }
+
+  deleteCase() {
+    const confirm_text = this.caseMeta?.name;
+    if (!this.caseMeta || !this.caseMeta.name) return;
+    const modal = this.dialogService.open(DeleteConfirmModalComponent, {
+      header: 'Confirm to delete',
+      modal: true,
+      closable: true,
+      dismissableMask: true,
+      breakpoints: {
+        '640px': '90vw',
+      },
+      data: confirm_text,
+    });
+
+    modal.onClose.pipe(take(1)).subscribe((confirmed: string | null) => {
+      if (!confirmed || confirm_text != confirmed) return;
+      this.apiService
+        .deleteCase(this.caseMeta!.guid)
+        .pipe(take(1))
+        .subscribe({
+          next: () => this.utilsService.navigateHomeWithError(),
+          error: () => this.utilsService.toast('error', 'Error', 'An error occured, case not deleted'),
         });
     });
   }
