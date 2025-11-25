@@ -119,26 +119,27 @@ export class DashboardComponent {
 
   updateDisplayedCases(cases: CaseMetadata[], inputVal?: string): void {
     if (inputVal) {
-    const sha256Regex = /^[a-fA-F0-9]{64}$/;    
-    if (sha256Regex.test(inputVal)) {
-      this.apiService.hashLookup(inputVal)
-        .pipe(take(1))
-        .subscribe(results => {
-          this.displayedCases = results;
-        });
+      const sha256Regex = /^[a-fA-F0-9]{64}$/;
+      if (sha256Regex.test(inputVal)) {
+        this.apiService
+          .hashLookup(inputVal)
+          .pipe(take(1))
+          .subscribe((results) => {
+            this.displayedCases = results;
+          });
+      } else {
+        this.displayedCases = cases.filter(
+          (c: CaseMetadata) =>
+            c.name.toLowerCase().includes(inputVal.toLowerCase()) ||
+            c.description?.toLowerCase().includes(inputVal.toLowerCase()) ||
+            c.tsid?.toString().includes(inputVal),
+        );
+      }
     } else {
-      this.displayedCases = cases.filter(
-        (c: CaseMetadata) =>
-          c.name.toLowerCase().includes(inputVal.toLowerCase()) ||
-          c.description?.toLowerCase().includes(inputVal.toLowerCase()) ||
-          c.tsid?.toString().includes(inputVal),
-      );
+      this.displayedCases = [...cases].sort((a, b) => {
+        if (a.closed !== b.closed) return a.closed ? 1 : -1;
+        return new Date(b.created!).getTime() - new Date(a.created!).getTime();
+      });
     }
-  } else {
-    this.displayedCases = [...cases].sort((a, b) => {
-      if (a.closed !== b.closed) return a.closed ? 1 : -1;
-      return new Date(b.created!).getTime() - new Date(a.created!).getTime();
-    });
-  }
   }
 }

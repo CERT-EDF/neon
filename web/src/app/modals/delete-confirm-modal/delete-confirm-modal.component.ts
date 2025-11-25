@@ -24,7 +24,7 @@ export class DeleteConfirmModalComponent {
 
   close() {
     const value = this.confirmInput.value;
-    if (!value || (this.toConfirm != this.confirmInput.value)) return;
+    if (!value || this.toConfirm != this.confirmInput.value) return;
     this.ref.close(true);
   }
 }
