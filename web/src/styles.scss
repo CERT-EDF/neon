@@ -31,17 +31,8 @@
 
 html {
   font-size: 15px;
-  font-family:
-    Roboto,
-    -apple-system,
-    BlinkMacSystemFont,
-    'Segoe UI',
-    Helvetica,
-    Arial,
-    sans-serif,
-    'Apple Color Emoji',
-    'Segoe UI Emoji',
-    'Segoe UI Symbol';
+  font-family: Roboto, -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif, 'Apple Color Emoji',
+    'Segoe UI Emoji', 'Segoe UI Symbol';
   line-height: normal;
 }
 
@@ -114,91 +105,112 @@ html {
 }
 
 .md {
-  h1,
-  h2,
-  h3,
-  h4,
+  * {
+    margin: revert;
+    padding: revert;
+    list-style: revert;
+  }
+
+  h1 {
+    font-size: 36px;
+  }
+  h2 {
+    font-size: 30px;
+  }
+  h3 {
+    font-size: 24px;
+  }
+  h4 {
+    font-size: 18px;
+  }
   h5 {
-    margin: 0px !important;
+    font-size: 14px;
+  }
+  h6 {
+    font-size: 12px;
   }
 
-  // When using - Text - Text
-  ul {
-    margin-top: 0rem !important;
-    padding-left: 2rem !important;
-    line-height: 1.1rem !important;
-
-    li {
-      line-height: 1.5rem !important;
-    }
-  }
-
-  // When using 1. Text 2. Text
-  ol {
-    margin: -1rem 0rem !important;
-    padding-left: 2rem !important;
-    line-height: 1.1rem !important;
+  hr {
+    margin-top: 20px;
+    margin-bottom: 20px;
   }
 
   p {
-    margin: 0px !important;
-    line-height: 1.6rem !important;
+    margin: 0 0 10px;
   }
 
-  // When using `text`
-  code {
-    @apply text-sm py-1 px-2 font-mono;
-    &::before,
-    &::after {
-      // Override tailwind prose `
-      content: '' !important;
-    }
-  }
-
-  pre {
-    margin: -1rem 0 0 0 !important;
-    @apply dark:!bg-black;
-  }
-
-  // When using ```code```
-  pre code {
-    display: block !important;
-  }
-
-  // When using "> text"
   blockquote {
-    padding-left: 1rem !important;
-    border-left: 2px solid #e66755 !important;
-    margin: 0px !important;
-
-    p {
-      margin: -0.8rem 0 !important;
-    }
+    padding: 10px 20px;
+    margin: 0 0 20px;
+    border-left: 5px solid #eee;
   }
 
-  // When using tables, from official docs styles
+  code {
+    padding: 2px 4px;
+    font-size: 90%;
+    color: #c7254e;
+    background-color: #f9f2f4;
+    border-radius: 4px;
+    @apply font-mono;
+  }
+
+  a {
+    color: #428bca;
+    text-decoration: none;
+  }
+
+  sup {
+    top: -0.5em;
+  }
+
+  sub {
+    bottom: -0.25em;
+  }
+
+  sub,
+  sup {
+    position: relative;
+    font-size: 75%;
+    line-height: 0;
+    vertical-align: baseline;
+  }
+
+  mark {
+    padding: 0.2em;
+    background-color: #fcf8e3;
+  }
+
   table {
-    width: 100% !important;
-    margin: -1rem 0 0 0 !important;
+    max-width: 100%;
+    margin: -1rem 0 20px 0;
+    display: block;
+    overflow-y: auto;
+
+    tbody > tr:nth-child(odd) > td,
+    tbody > tr:nth-child(odd) > th {
+      background-color: #f9f9f9;
+    }
 
     th {
       white-space: nowrap;
+      padding: 0px 8px;
     }
 
     th[align=''],
     th:not([align]) {
-      text-align: left !important;
+      text-align: left;
     }
 
     td {
-      vertical-align: middle !important;
+      padding: 8px !important;
+      vertical-align: middle;
     }
 
     td,
     th {
-      border-bottom-width: 1px !important;
-      border-bottom-style: solid !important;
-      border-bottom-color: rgba(0, 0, 0, 0.12) !important;
+      border-bottom-width: 1px;
+      border-bottom-style: solid;
+      border-bottom-color: rgba(0, 0, 0, 0.12);
     }
   }
 }

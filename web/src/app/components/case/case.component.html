@@ -39,11 +39,11 @@
         <textarea rows="5" fluid pTextarea #caseReportInput formControlName="report"
           placeholder="You can type **markdown** syntax in here"></textarea>
 
-        <div class="prose dark:prose-invert max-w-full md mt-4">
+        <div class="max-w-full md mt-4">
           <markdown [data]="caseReportInput.value"></markdown>
         </div>
         } @else {
-        <div class="prose dark:prose-invert md max-w-full line-clamp-6">
+        <div class="prose dark:prose-invert md max-w-full">
           <markdown [data]="caseMeta?.report || 'No data'"></markdown>
         </div>
         }
@@ -138,6 +138,8 @@
               <p-button severity="success" [disabled]="!sampleForm.valid" (click)="updateSample()" icon="pi pi-check"
                 text label="Save" />
               } @else {
+              <p-button severity="danger" icon="pi pi-trash"
+                (click)="deleteSample(sample)" label="Trash" text />
               <p-button severity="secondary" icon="pi pi-pencil" [disabled]="editedSampleID"
                 (click)="editedSampleID = sample.guid" label="Edit" text />
               <p-button severity="primary" icon="pi pi-ellipsis-h"
@@ -307,7 +309,8 @@
                   <div class="event-box-text dark:text-gray-300">
                     <div>
                       <span class="flex-[0_0_10ch]">Name</span>
-                      <span class="truncate">{{ sample.name }}</span>
+                      <span class="cursor-pointer truncate" pTooltip="Click to copy"
+                        [cdkCopyToClipboard]="sample.name">{{ sample.name }}</span>
                     </div>
                     <div>
                       <span class="flex-[0_0_10ch]">Date</span>

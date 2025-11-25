@@ -39,6 +39,7 @@ import { SampleLogsModalComponent } from '../../modals/sample-logs-modal/sample-
 import { take } from 'rxjs';
 import { CaseCreateModalComponent } from '../../modals/case-create-modal/case-create-modal.component';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { DeleteConfirmModalComponent } from '../../modals/delete-confirm-modal/delete-confirm-modal.component';
 
 @Component({
   selector: 'app-case',
@@ -457,6 +458,31 @@ export class CaseComponent {
         }
         this.editedSampleID = null;
       });
+  }
+
+  deleteSample(sample: CaseSampleMetadata) {
+    const modal = this.dialogService.open(DeleteConfirmModalComponent, {
+      header: 'Confirm to delete',
+      modal: true,
+      closable: true,
+      focusOnShow: false,
+      dismissableMask: true,
+      breakpoints: { '640px': '90vw' },
+      data: sample.name,
+    });
+
+    modal.onClose.pipe(take(1)).subscribe((confirmed: string | null) => {
+      if (!confirmed) return;
+      this.apiService.deleteSample(this.caseMeta!.guid, sample.guid).pipe(take(1)).subscribe({
+        next: () => {
+          const sampleIndex = this.caseSamples.findIndex((s) => s.guid === sample.guid);
+          if (sampleIndex > -1) this.caseSamples.splice(sampleIndex, 1);
+          const displayedIndex = this.displayedSamples.findIndex((s) => s.guid === sample.guid);
+          if (displayedIndex > -1) this.caseSamples.splice(displayedIndex, 1);
+        },
+        error: () => this.utilsService.toast('error', 'Error', 'An error occured, sample not deleted')
+      })
+    })
   }
 
   downloadRuleset(guid: string): void {
