@@ -24,7 +24,7 @@ export class ApiService {
     return this.http.post<APIResponse<User>>(`${this.apiBaseUrl}/auth/login`, { data }).pipe(
       tap((resp) => {
         if (resp.data) this._userSubject$.next(resp.data.username);
-      })
+      }),
     );
   }
 
@@ -38,7 +38,7 @@ export class ApiService {
         this._userSubject$.next('');
         this.utils.toast('success', 'Logged out', 'Logged out successfully');
         this.router.navigate(['/login']);
-      })
+      }),
     );
   }
 
@@ -50,7 +50,7 @@ export class ApiService {
     if (this.infoCache) return of(this.infoCache);
     return this.http.get<APIResponse<Info>>(`${this.apiBaseUrl}/info`).pipe(
       tap((resp) => (this.infoCache = resp.data)),
-      map((resp) => resp.data)
+      map((resp) => resp.data),
     );
   }
 
@@ -63,7 +63,7 @@ export class ApiService {
           this.utils.banner = resp.data.banner;
         }
       }),
-      map((resp) => resp.data)
+      map((resp) => resp.data),
     );
   }
 
@@ -75,7 +75,7 @@ export class ApiService {
       }),
       map(() => true),
       distinctUntilChanged(),
-      shareReplay({ bufferSize: 1, refCount: true })
+      shareReplay({ bufferSize: 1, refCount: true }),
     );
   }
 
@@ -87,7 +87,7 @@ export class ApiService {
         return { users, groups };
       }),
       distinctUntilChanged(),
-      shareReplay({ bufferSize: 1, refCount: true })
+      shareReplay({ bufferSize: 1, refCount: true }),
     );
   }
 
@@ -95,7 +95,7 @@ export class ApiService {
     return this.http.get<APIResponse<CaseMetadata>>(`${this.apiBaseUrl}/case/${caseGuid}`).pipe(
       map((resp) => resp.data),
       distinctUntilChanged(),
-      shareReplay({ bufferSize: 1, refCount: true })
+      shareReplay({ bufferSize: 1, refCount: true }),
     );
   }
 
@@ -112,14 +112,14 @@ export class ApiService {
         this.utils.refreshStoredCases(resp);
       }),
       distinctUntilChanged(),
-      shareReplay({ bufferSize: 1, refCount: true })
+      shareReplay({ bufferSize: 1, refCount: true }),
     );
   }
 
   postCase(caseData: CaseMetadata): Observable<CaseMetadata> {
     return this.http.post<APIResponse<CaseMetadata>>(`${this.apiBaseUrl}/case`, caseData).pipe(
       tap((resp) => this.utils.addCaseGuidToStorage(resp.data.guid)),
-      map((resp) => resp.data)
+      map((resp) => resp.data),
     );
   }
 
@@ -133,7 +133,7 @@ export class ApiService {
     return this.http.get<APIResponse<CaseSampleMetadata[]>>(`${this.apiBaseUrl}/case/${caseGuid}/samples`).pipe(
       map((resp) => resp.data || []),
       distinctUntilChanged(),
-      shareReplay({ bufferSize: 1, refCount: true })
+      shareReplay({ bufferSize: 1, refCount: true }),
     );
   }
 
@@ -143,7 +143,7 @@ export class ApiService {
       .pipe(
         map((resp) => {
           window.open(`${this.apiBaseUrl}/download/${resp.data.guid}/${resp.data.token}`, '_blank');
-        })
+        }),
       );
   }
 
@@ -151,7 +151,7 @@ export class ApiService {
     return this.http.get<APIResponse<CaseSampleMetadata[]>>(`${this.apiBaseUrl}/samples`).pipe(
       map((resp) => resp.data || []),
       distinctUntilChanged(),
-      shareReplay({ bufferSize: 1, refCount: true })
+      shareReplay({ bufferSize: 1, refCount: true }),
     );
   }
 
@@ -169,7 +169,7 @@ export class ApiService {
   putCaseSample(
     sample: Partial<CaseSampleMetadata>,
     caseGuid: string,
-    sampleGuid: string
+    sampleGuid: string,
   ): Observable<CaseSampleMetadata> {
     return this.http
       .put<APIResponse<CaseSampleMetadata>>(`${this.apiBaseUrl}/case/${caseGuid}/sample/${sampleGuid}`, sample)
@@ -190,13 +190,13 @@ export class ApiService {
 
   downloadSampleAnalysis(caseGuid: string, sampleGuid: string, analyzerName: string): Observable<void> {
     return this.http
-      .get<APIResponse<any>>(
-        `${this.apiBaseUrl}/case/${caseGuid}/sample/${sampleGuid}/analysis/${analyzerName}/download`
-      )
+      .get<
+        APIResponse<any>
+      >(`${this.apiBaseUrl}/case/${caseGuid}/sample/${sampleGuid}/analysis/${analyzerName}/download`)
       .pipe(
         map((resp) => {
           window.open(`${this.apiBaseUrl}/download/${resp.data.guid}/${resp.data.token}`, '_blank');
-        })
+        }),
       );
   }
 

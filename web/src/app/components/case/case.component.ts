@@ -474,16 +474,19 @@ export class CaseComponent {
 
     modal.onClose.pipe(take(1)).subscribe((confirmed: string | null) => {
       if (!confirmed || confirm_text != confirmed) return;
-      this.apiService.deleteSample(this.caseMeta!.guid, sample.guid).pipe(take(1)).subscribe({
-        next: () => {
-          const sampleIndex = this.caseSamples.findIndex((s) => s.guid === sample.guid);
-          if (sampleIndex > -1) this.caseSamples.splice(sampleIndex, 1);
-          const displayedIndex = this.displayedSamples.findIndex((s) => s.guid === sample.guid);
-          if (displayedIndex > -1) this.caseSamples.splice(displayedIndex, 1);
-        },
-        error: () => this.utilsService.toast('error', 'Error', 'An error occured, sample not deleted')
-      })
-    })
+      this.apiService
+        .deleteSample(this.caseMeta!.guid, sample.guid)
+        .pipe(take(1))
+        .subscribe({
+          next: () => {
+            const sampleIndex = this.caseSamples.findIndex((s) => s.guid === sample.guid);
+            if (sampleIndex > -1) this.caseSamples.splice(sampleIndex, 1);
+            const displayedIndex = this.displayedSamples.findIndex((s) => s.guid === sample.guid);
+            if (displayedIndex > -1) this.caseSamples.splice(displayedIndex, 1);
+          },
+          error: () => this.utilsService.toast('error', 'Error', 'An error occured, sample not deleted'),
+        });
+    });
   }
 
   downloadRuleset(guid: string): void {
