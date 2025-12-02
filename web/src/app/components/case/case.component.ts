@@ -38,7 +38,6 @@ import { CardModule } from 'primeng/card';
 import { SampleLogsModalComponent } from '../../modals/sample-logs-modal/sample-logs-modal.component';
 import { take } from 'rxjs';
 import { CaseCreateModalComponent } from '../../modals/case-create-modal/case-create-modal.component';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { DeleteConfirmModalComponent } from '../../modals/delete-confirm-modal/delete-confirm-modal.component';
 
 @Component({
@@ -388,7 +387,7 @@ export class CaseComponent {
               }),
         };
 
-    const items: MenuItem[] = [
+    this.caseMenuItems = [
       {
         label: 'Generate Report',
         icon: 'pi pi-file-export',
@@ -421,8 +420,6 @@ export class CaseComponent {
         command: () => this.deleteCase(),
       },
     ];
-
-    this.caseMenuItems = [...items];
     this.caseMenu.toggle(ev);
   }
 
@@ -467,7 +464,6 @@ export class CaseComponent {
   }
 
   deleteSample(sample: CaseSampleMetadata) {
-    const confirm_text = sample.name;
     const modal = this.dialogService.open(DeleteConfirmModalComponent, {
       header: 'Confirm to delete',
       modal: true,
@@ -475,48 +471,23 @@ export class CaseComponent {
       focusOnShow: false,
       dismissableMask: true,
       breakpoints: { '640px': '90vw' },
-      data: confirm_text,
+      data: sample.name,
     });
 
-    modal.onClose.pipe(take(1)).subscribe((confirmed: string | null) => {
-      if (!confirmed || confirm_text != confirmed) return;
-      this.apiService
-        .deleteSample(this.caseMeta!.guid, sample.guid)
-        .pipe(take(1))
-        .subscribe({
-          next: () => {
-            const sampleIndex = this.caseSamples.findIndex((s) => s.guid === sample.guid);
-            if (sampleIndex > -1) this.caseSamples.splice(sampleIndex, 1);
-            const displayedIndex = this.displayedSamples.findIndex((s) => s.guid === sample.guid);
-            if (displayedIndex > -1) this.caseSamples.splice(displayedIndex, 1);
-          },
-          error: () => this.utilsService.toast('error', 'Error', 'An error occured, sample not deleted'),
-        });
-    });
-  }
-
-  deleteCase() {
-    const confirm_text = this.caseMeta?.name;
-    if (!this.caseMeta || !this.caseMeta.name) return;
-    const modal = this.dialogService.open(DeleteConfirmModalComponent, {
-      header: 'Confirm to delete',
-      modal: true,
-      closable: true,
-      dismissableMask: true,
-      breakpoints: {
-        '640px': '90vw',
-      },
-      data: confirm_text,
-    });
-
-    modal.onClose.pipe(take(1)).subscribe((confirmed: string | null) => {
-      if (!confirmed || confirm_text != confirmed) return;
+    modal.onClose.pipe(take(1)).subscribe((confirmed: boolean) => {
+      if (!confirmed) return;
       this.apiService
         .deleteCase(this.caseMeta!.guid)
         .pipe(take(1))
         .subscribe({
-          next: () => this.utilsService.navigateHomeWithError(),
-          error: () => this.utilsService.toast('error', 'Error', 'An error occured, case not deleted'),
+          next: () => {
+            this.caseSamples = this.caseSamples.filter((s) => s.guid != sample.guid);
+            this.displayedSamples = this.displayedSamples.filter((s) => s.guid != sample.guid);
+            this.selectedSampleTabID = '';
+            setTimeout(() => {
+              this.selectedSampleTabID = this.displayedSamples[0]?.guid || '';
+            }, 10);
+          },
         });
     });
   }
@@ -653,6 +624,30 @@ export class CaseComponent {
       .subscribe({
         next: (meta) => (this.caseMeta = meta),
       });
+  }
+
+  deleteCase() {
+    if (!this.caseMeta || !this.caseMeta.name) return;
+    const modal = this.dialogService.open(DeleteConfirmModalComponent, {
+      header: 'Confirm to delete',
+      modal: true,
+      closable: true,
+      dismissableMask: true,
+      breakpoints: {
+        '640px': '90vw',
+      },
+      data: this.caseMeta?.name,
+    });
+
+    modal.onClose.pipe(take(1)).subscribe((confirmed: boolean) => {
+      if (!confirmed) return;
+      this.apiService
+        .deleteCase(this.caseMeta!.guid)
+        .pipe(take(1))
+        .subscribe({
+          next: () => this.utilsService.navigateHomeWithError(),
+        });
+    });
   }
 
   switchEditReport(): void {

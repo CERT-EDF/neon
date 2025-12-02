@@ -29,7 +29,7 @@ export const Interceptor = (req: HttpRequest<unknown>, next: HttpHandlerFn): Obs
           break;
 
         case 403:
-          utilsService.navigateHomeWithError();
+          utilsService.toast('error', 'Forbidden', 'You are not allowed to do this', 3500);
           break;
 
         case 404:
