@@ -139,7 +139,7 @@
                 text label="Save" />
               } @else {
               <p-button severity="danger" icon="pi pi-trash"
-                (click)="deleteSample(sample)" label="Trash" text />
+                (click)="deleteSample(sample)" [disabled]="editedSampleID == sample.guid" pTooltip="Delete Sample" text />
               <p-button severity="secondary" icon="pi pi-pencil" [disabled]="editedSampleID"
                 (click)="editedSampleID = sample.guid" label="Edit" text />
               <p-button severity="primary" icon="pi pi-ellipsis-h"

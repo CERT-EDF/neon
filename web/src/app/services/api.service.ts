@@ -5,7 +5,7 @@ import { UtilsService } from './utils.service';
 import { AuthParams } from '../types/OIDC';
 import { APIResponse, Constant, Info, PendingDownloadKey, AnalyzerInfo, Identity, User } from '../types/API';
 import { Router } from '@angular/router';
-import { CaseMetadata, CaseSampleMetadata, SampleAnalysis } from '../types/case';
+import { CaseMetadata, CaseSampleMetadata, SampleAnalysis, DigestHits } from '../types/case';
 
 @Injectable({ providedIn: 'root' })
 export class ApiService {
@@ -210,9 +210,9 @@ export class ApiService {
       .pipe(map((resp) => resp.data));
   }
 
-  hashLookup(hash: string): Observable<CaseMetadata[]> {
-    this.http
-      .get<APIResponse<CaseMetadata[]>>(`${this.apiBaseUrl}/search/digest/${hash}`)
-      .pipe(map((resp) => resp.data));
+  searchDigest(hash: string): Observable<CaseMetadata[]> {
+    return this.http
+      .get<APIResponse<DigestHits>>(`${this.apiBaseUrl}/search/digest/${hash}`)
+      .pipe(map((resp) => resp.data.hits.map((hit) => hit.case)));
   }
 }

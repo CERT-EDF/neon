@@ -122,7 +122,7 @@ export class DashboardComponent {
       const sha256Regex = /^[a-fA-F0-9]{64}$/;
       if (sha256Regex.test(inputVal)) {
         this.apiService
-          .hashLookup(inputVal)
+          .searchDigest(inputVal)
           .pipe(take(1))
           .subscribe((results) => {
             this.displayedCases = results;
