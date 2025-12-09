@@ -38,6 +38,6 @@ async def api_search_digest_get(request: Request):
         primary_digest
     ):
         digest_hits.total += 1
-        if fusion_auth_api.can_access_case(case, identity):
+        if fusion_auth_api.can_access_case(identity, case):
             digest_hits.hits.append(CaseHit(case=case, sample=sample))
-    return json_response(data=digest_hits)
+    return json_response(data=digest_hits.to_dict())

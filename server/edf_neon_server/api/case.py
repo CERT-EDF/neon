@@ -140,7 +140,7 @@ async def api_sample_delete(request: Request):
     if not deleted:
         return json_response(status=400, message="Not deleted")
     await fusion_evt_api.notify(
-        category='delete_sample', case=case, ext={'sample': sample.to_dict()}
+        category='delete_sample', case=case, ext=sample.to_dict()
     )
     return json_response()
 
@@ -338,7 +338,7 @@ async def api_sample_post(request: Request):
     samples = [sample.to_dict() for sample in samples]
     case = await storage.retrieve_case(case_guid)
     await fusion_evt_api.notify(
-        category='create_sample', case=case, ext={'samples': samples}
+        category='create_samples', case=case, ext=samples
     )
     return json_response(data=samples)
 
@@ -366,6 +366,6 @@ async def api_sample_put(request: Request):
     sample = sample.to_dict()
     case = await storage.retrieve_case(case_guid)
     await fusion_evt_api.notify(
-        category='update_sample', case=case, ext={'sample': sample}
+        category='update_sample', case=case, ext=sample
     )
     return json_response(data=sample)
