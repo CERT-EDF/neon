@@ -17,7 +17,17 @@
         <div class="mt-1"><p-skeleton height="2rem" width="400px"></p-skeleton></div>
         }
       </div>
-      <p-button icon="pi pi-ellipsis-h" (click)="constructCaseMenu($event)" severity="secondary" text />
+
+      <div class="flex gap-2 items-center">
+        <div class="flex -space-x-4 max-w-96 select-none">
+          @for (user of activeUsers; track user) {
+          <div [pTooltip]="user"
+            class="flex items-center capitalize justify-center bg-gray-400 w-10 h-10 text-xs font-medium text-white border-2 border-white rounded-full">
+            <span class="w-[1.2ch] overflow-hidden">{{ user }}</span></div>
+          }
+        </div>
+        <p-button icon="pi pi-ellipsis-h" (click)="constructCaseMenu($event)" severity="secondary" text />
+      </div>
     </div>
 
     <p-card styleClass="mt-4 md:mt-8">
@@ -139,7 +149,7 @@
                 text label="Save" />
               } @else {
               <p-button severity="danger" icon="pi pi-trash"
-                (click)="deleteSample(sample)" label="Trash" text />
+                (click)="deleteSample(sample)" [disabled]="editedSampleID == sample.guid" pTooltip="Delete Sample" text />
               <p-button severity="secondary" icon="pi pi-pencil" [disabled]="editedSampleID"
                 (click)="editedSampleID = sample.guid" label="Edit" text />
               <p-button severity="primary" icon="pi pi-ellipsis-h"

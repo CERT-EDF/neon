@@ -42,3 +42,20 @@ export interface SampleAnalysis {
   status: string;
   analyzer: string;
 }
+
+export interface CaseHit {
+  case: CaseMetadata;
+  sample: CaseMetadata;
+}
+
+export interface DigestHits {
+  total: number;
+  hits: CaseHit[];
+}
+
+export interface FusionEvent {
+  source: string;
+  category: string;
+  case: CaseMetadata;
+  ext: any;
+}

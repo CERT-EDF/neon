@@ -1,11 +1,22 @@
 import { Injectable, inject } from '@angular/core';
-import { BehaviorSubject, Observable, distinctUntilChanged, map, of, shareReplay, tap } from 'rxjs';
+import {
+  BehaviorSubject,
+  Observable,
+  distinctUntilChanged,
+  map,
+  of,
+  shareReplay,
+  tap,
+  retry,
+  catchError,
+  throwError,
+} from 'rxjs';
 import { HttpClient } from '@angular/common/http';
 import { UtilsService } from './utils.service';
 import { AuthParams } from '../types/OIDC';
 import { APIResponse, Constant, Info, PendingDownloadKey, AnalyzerInfo, Identity, User } from '../types/API';
 import { Router } from '@angular/router';
-import { CaseMetadata, CaseSampleMetadata, SampleAnalysis } from '../types/case';
+import { CaseMetadata, CaseSampleMetadata, SampleAnalysis, DigestHits } from '../types/case';
 
 @Injectable({ providedIn: 'root' })
 export class ApiService {
@@ -210,9 +221,34 @@ export class ApiService {
       .pipe(map((resp) => resp.data));
   }
 
-  hashLookup(hash: string): Observable<CaseMetadata[]> {
-    this.http
-      .get<APIResponse<CaseMetadata[]>>(`${this.apiBaseUrl}/search/digest/${hash}`)
-      .pipe(map((resp) => resp.data));
+  getCaseEventsSSE(guid: string): Observable<MessageEvent> {
+    return new Observable<MessageEvent>((obs) => {
+      const eventSource = new EventSource(`${this.apiBaseUrl}/events/case/${guid}`);
+      eventSource.onmessage = (event: MessageEvent) => obs.next(event);
+      eventSource.onerror = (error) => {
+        this.utils.toast('error', 'EventSource disconnected', 'EventSource disconnected, reconnecting...');
+        obs.error(error);
+        eventSource.close();
+      };
+      eventSource.onopen = () => console.log('EventSource connected');
+      return () => eventSource.close();
+    }).pipe(
+      retry({ count: 5, delay: 1000, resetOnSuccess: true }),
+      catchError((error) => {
+        this.utils.toast(
+          'error',
+          'EventSource disconnected',
+          'Roses are red, Violets are blue, EventSource is disconnected, there is nothing I can do for you',
+          -1,
+        );
+        return throwError(() => error);
+      }),
+    );
+  }
+
+  searchDigest(hash: string): Observable<CaseMetadata[]> {
+    return this.http
+      .get<APIResponse<DigestHits>>(`${this.apiBaseUrl}/search/digest/${hash}`)
+      .pipe(map((resp) => resp.data.hits.map((hit) => hit.case)));
   }
 }

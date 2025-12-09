@@ -1,4 +1,4 @@
-import { Component, ElementRef, HostListener, ViewChild } from '@angular/core';
+import { ChangeDetectorRef, Component, ElementRef, HostListener, OnDestroy, ViewChild } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { ButtonModule } from 'primeng/button';
 import { FloatLabelModule } from 'primeng/floatlabel';
@@ -22,7 +22,7 @@ import { Menu, MenuModule } from 'primeng/menu';
 import { MenuItem } from 'primeng/api';
 import { TooltipModule } from 'primeng/tooltip';
 import { AnalyzerInfo } from '../../types/API';
-import { CaseMetadata, CaseSampleMetadata, SampleAnalysis } from '../../types/case';
+import { CaseMetadata, CaseSampleMetadata, FusionEvent, SampleAnalysis } from '../../types/case';
 import { UtilsService } from '../../services/utils.service';
 import { HttpErrorResponse, HttpEvent, HttpEventType } from '@angular/common/http';
 import { DatePipe, KeyValuePipe } from '@angular/common';
@@ -36,9 +36,8 @@ import { ChipModule } from 'primeng/chip';
 import { HexPipe } from '../../shared/hex.pipe';
 import { CardModule } from 'primeng/card';
 import { SampleLogsModalComponent } from '../../modals/sample-logs-modal/sample-logs-modal.component';
-import { take } from 'rxjs';
+import { Subscription, take } from 'rxjs';
 import { CaseCreateModalComponent } from '../../modals/case-create-modal/case-create-modal.component';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { DeleteConfirmModalComponent } from '../../modals/delete-confirm-modal/delete-confirm-modal.component';
 
 @Component({
@@ -74,7 +73,7 @@ import { DeleteConfirmModalComponent } from '../../modals/delete-confirm-modal/d
   styleUrl: './case.component.scss',
   providers: [FileSizePipe],
 })
-export class CaseComponent {
+export class CaseComponent implements OnDestroy {
   @ViewChild('caseMenu') caseMenu!: Menu;
 
   @HostListener('document:dragenter', ['$event'])
@@ -132,6 +131,9 @@ export class CaseComponent {
   sampleFilteredTags: string[] = [];
   sampleAvailableIndicatorNature: string[] = [];
 
+  eventSource!: Subscription;
+  activeUsers: string[] = [];
+
   caseForm: FormGroup;
   sampleForm: FormGroup;
   baseSampleForm: FormGroup;
@@ -176,42 +178,41 @@ export class CaseComponent {
   set editedSampleID(guid: string | null) {
     this._editedSampleID = guid;
     this.resetSampleForm();
+    if (!guid) return;
+    const sample = this.caseSamples.find((s) => s.guid === guid)!;
+    this.sampleForm.patchValue(sample);
 
-    if (guid) {
-      const sample = this.caseSamples.find((s) => s.guid === guid)!;
-      this.sampleForm.patchValue(sample);
+    sample.indicators.forEach((indicator) => this.addIndicator(indicator.nature, indicator.value));
 
-      sample.indicators.forEach((indicator) => this.addIndicator(indicator.nature, indicator.value));
+    const rulesets = this.sampleForm.get('rulesets') as FormGroup;
+    Object.entries(sample.rulesets!).forEach(([ruleName, ruleValue]) =>
+      rulesets.addControl(ruleName, new FormControl(ruleValue)),
+    );
 
-      const rulesets = this.sampleForm.get('rulesets') as FormGroup;
-      Object.entries(sample.rulesets!).forEach(([ruleName, ruleValue]) =>
-        rulesets.addControl(ruleName, new FormControl(ruleValue)),
-      );
+    setTimeout(() => {
+      this.sampleTabContentRef?.nativeElement.scrollIntoView({
+        block: 'start',
+        behavior: 'smooth',
+      });
+    }, 10);
 
-      setTimeout(() => {
-        this.sampleTabContentRef?.nativeElement.scrollIntoView({
-          block: 'start',
-          behavior: 'smooth',
-        });
-      }, 10);
+    this.apiService
+      .getConstant()
+      .pipe(take(1))
+      .subscribe((constant) => {
+        this.sampleAvailableTags = constant.tags.slice().sort();
+        this.sampleFilteredTags = this.sampleAvailableTags;
+        this.sampleAvailableIndicatorNature = constant.enums.indicator_nature.slice().sort();
+      });
 
-      this.apiService
-        .getConstant()
-        .pipe(take(1))
-        .subscribe((constant) => {
-          this.sampleAvailableTags = constant.tags.slice().sort();
-          this.sampleFilteredTags = this.sampleAvailableTags;
-          this.sampleAvailableIndicatorNature = constant.enums.indicator_nature.slice().sort();
-        });
-
-      this.tags = sample.tags ?? [];
-    }
+    this.tags = sample.tags ?? [];
   }
 
   constructor(
     private apiService: ApiService,
     private fb: FormBuilder,
     private route: ActivatedRoute,
+    private cdr: ChangeDetectorRef,
     private filesizePipe: FileSizePipe,
     private utilsService: UtilsService,
     private dialogService: DialogService,
@@ -240,6 +241,11 @@ export class CaseComponent {
         next: (data) => {
           this.caseMeta = data;
 
+          this.eventSource = this.apiService.getCaseEventsSSE(this.caseMeta!.guid).subscribe({
+            next: (event) => this.handleSSEEvent(event),
+            error: (error) => console.error('SSE error:', error),
+          });
+
           this.apiService
             .getCaseSamples(this.caseMeta.guid)
             .pipe(take(1))
@@ -259,6 +265,79 @@ export class CaseComponent {
       .subscribe({
         next: (infos) => (this.analyzerInfos = infos),
       });
+  }
+
+  ngOnDestroy(): void {
+    if (this.eventSource) this.eventSource.unsubscribe();
+  }
+
+  handleSSEEvent(messageEvent: MessageEvent): void {
+    if (!messageEvent.data) return;
+    const event: FusionEvent = JSON.parse(messageEvent.data);
+    const ext = event.ext;
+    switch (event.category) {
+      case 'subscribers':
+        this.activeUsers = ext.usernames;
+        break;
+      case 'subscribe':
+        if (!this.activeUsers.includes(ext.username)) this.activeUsers.push(ext.username);
+        break;
+      case 'unsubscribe':
+        this.activeUsers = this.activeUsers.filter((u) => u !== ext.username);
+        break;
+      case 'create_sample':
+        this.caseSamples = [...this.caseSamples, ext];
+        this.sortSamples();
+        break;
+      case 'create_samples':
+        this.caseSamples = [...this.caseSamples, ...ext];
+        this.sortSamples();
+        break;
+      case 'update_sample':
+        const sampleIndex = this.caseSamples.findIndex((s) => s.guid === ext.guid);
+        if (sampleIndex > -1) {
+          this.caseSamples = [
+            ...this.caseSamples.slice(0, sampleIndex),
+            ext,
+            ...this.caseSamples.slice(sampleIndex + 1),
+          ];
+        }
+
+        const displayedIndex = this.displayedSamples.findIndex((s) => s.guid === ext.guid);
+        if (displayedIndex > -1) {
+          this.displayedSamples = [
+            ...this.displayedSamples.slice(0, displayedIndex),
+            ext,
+            ...this.displayedSamples.slice(displayedIndex + 1),
+          ];
+        }
+        this.sortSamples();
+        break;
+      case 'delete_sample':
+        this.caseSamples = this.caseSamples.filter((s) => s.guid != ext.guid);
+        if (this.displayedSamples.findIndex((s) => s.guid == ext.guid) > -1) {
+          this.displayedSamples = this.displayedSamples.filter((s) => s.guid != ext.guid);
+          this.selectedSampleTabID = '';
+          setTimeout(() => (this.selectedSampleTabID = this.displayedSamples[0]?.guid || ''), 10);
+        }
+        break;
+      case 'update_case':
+        this.caseMeta = event.case;
+        break;
+      case 'delete_case':
+        this.utilsService.toast('info', 'Case deleted', 'This case was deleted');
+        this.utilsService.navigateHomeWithError();
+        break;
+      default: {
+        if (!event.category.startsWith('analysis_')) break;
+        const sample = ext.sample;
+        const analysis = ext.analysis;
+        const status = event.category.split('analysis_')[1];
+        if (this.analyses.hasOwnProperty(sample.guid))
+          this.analyses[sample.guid][analysis.analyzer] = { ...analysis, status };
+      }
+    }
+    this.cdr.markForCheck();
   }
 
   resetSampleForm(): void {
@@ -388,7 +467,7 @@ export class CaseComponent {
               }),
         };
 
-    const items: MenuItem[] = [
+    this.caseMenuItems = [
       {
         label: 'Generate Report',
         icon: 'pi pi-file-export',
@@ -421,8 +500,6 @@ export class CaseComponent {
         command: () => this.deleteCase(),
       },
     ];
-
-    this.caseMenuItems = [...items];
     this.caseMenu.toggle(ev);
   }
 
@@ -437,37 +514,19 @@ export class CaseComponent {
   updateSample(): void {
     const editedSample = this.caseSamples.find((s) => s.guid === this.editedSampleID);
     if (!editedSample) return;
-
     const data = this.sampleForm.value;
     data.tags = this.tags;
-
     this.apiService
       .putCaseSample(data, this.caseMeta!.guid, this.editedSampleID!)
       .pipe(take(1))
-      .subscribe((newSampleData) => {
-        const sampleIndex = this.caseSamples.findIndex((s) => s.guid === editedSample.guid);
-        if (sampleIndex > -1) {
-          this.caseSamples = [
-            ...this.caseSamples.slice(0, sampleIndex),
-            newSampleData,
-            ...this.caseSamples.slice(sampleIndex + 1),
-          ];
-        }
-
-        const displayedIndex = this.displayedSamples.findIndex((s) => s.guid === editedSample.guid);
-        if (displayedIndex > -1) {
-          this.displayedSamples = [
-            ...this.displayedSamples.slice(0, displayedIndex),
-            newSampleData,
-            ...this.displayedSamples.slice(displayedIndex + 1),
-          ];
-        }
-        this.editedSampleID = null;
+      .subscribe({
+        next: () => {
+          this.editedSampleID = null;
+        },
       });
   }
 
   deleteSample(sample: CaseSampleMetadata) {
-    const confirm_text = sample.name;
     const modal = this.dialogService.open(DeleteConfirmModalComponent, {
       header: 'Confirm to delete',
       modal: true,
@@ -475,49 +534,12 @@ export class CaseComponent {
       focusOnShow: false,
       dismissableMask: true,
       breakpoints: { '640px': '90vw' },
-      data: confirm_text,
+      data: sample.name,
     });
 
-    modal.onClose.pipe(take(1)).subscribe((confirmed: string | null) => {
-      if (!confirmed || confirm_text != confirmed) return;
-      this.apiService
-        .deleteSample(this.caseMeta!.guid, sample.guid)
-        .pipe(take(1))
-        .subscribe({
-          next: () => {
-            const sampleIndex = this.caseSamples.findIndex((s) => s.guid === sample.guid);
-            if (sampleIndex > -1) this.caseSamples.splice(sampleIndex, 1);
-            const displayedIndex = this.displayedSamples.findIndex((s) => s.guid === sample.guid);
-            if (displayedIndex > -1) this.caseSamples.splice(displayedIndex, 1);
-          },
-          error: () => this.utilsService.toast('error', 'Error', 'An error occured, sample not deleted'),
-        });
-    });
-  }
-
-  deleteCase() {
-    const confirm_text = this.caseMeta?.name;
-    if (!this.caseMeta || !this.caseMeta.name) return;
-    const modal = this.dialogService.open(DeleteConfirmModalComponent, {
-      header: 'Confirm to delete',
-      modal: true,
-      closable: true,
-      dismissableMask: true,
-      breakpoints: {
-        '640px': '90vw',
-      },
-      data: confirm_text,
-    });
-
-    modal.onClose.pipe(take(1)).subscribe((confirmed: string | null) => {
-      if (!confirmed || confirm_text != confirmed) return;
-      this.apiService
-        .deleteCase(this.caseMeta!.guid)
-        .pipe(take(1))
-        .subscribe({
-          next: () => this.utilsService.navigateHomeWithError(),
-          error: () => this.utilsService.toast('error', 'Error', 'An error occured, case not deleted'),
-        });
+    modal.onClose.pipe(take(1)).subscribe((confirmed: boolean) => {
+      if (!confirmed) return;
+      this.apiService.deleteSample(this.caseMeta!.guid, sample.guid).pipe(take(1)).subscribe();
     });
   }
 
@@ -562,7 +584,6 @@ export class CaseComponent {
 
   openUploadConfirmModal(file: File): void {
     if (!file) return;
-
     const modal = this.dialogService.open(UploadConfirmModal, {
       header: 'Upload Sample',
       modal: true,
@@ -598,8 +619,6 @@ export class CaseComponent {
                 `Sample${event.body.data.length > 1 ? 's' : ''} dissection complete`,
               );
               this.uploadProgress = null;
-              this.caseSamples = [...this.caseSamples, ...event.body.data];
-              this.sortSamples();
               break;
           }
         },
@@ -647,12 +666,26 @@ export class CaseComponent {
   }
 
   putCase(data: Partial<CaseMetadata>): void {
-    this.apiService
-      .putCase(this.caseMeta!.guid, data)
-      .pipe(take(1))
-      .subscribe({
-        next: (meta) => (this.caseMeta = meta),
-      });
+    this.apiService.putCase(this.caseMeta!.guid, data).pipe(take(1)).subscribe();
+  }
+
+  deleteCase() {
+    if (!this.caseMeta || !this.caseMeta.name) return;
+    const modal = this.dialogService.open(DeleteConfirmModalComponent, {
+      header: 'Confirm to delete',
+      modal: true,
+      closable: true,
+      dismissableMask: true,
+      breakpoints: {
+        '640px': '90vw',
+      },
+      data: this.caseMeta?.name,
+    });
+
+    modal.onClose.pipe(take(1)).subscribe((confirmed: boolean) => {
+      if (!confirmed) return;
+      this.apiService.deleteCase(this.caseMeta!.guid).pipe(take(1)).subscribe();
+    });
   }
 
   switchEditReport(): void {
