@@ -20,7 +20,7 @@ classifiers = [
     "Topic :: Security",
 ]
 dependencies = [
-    "edf-neon-core~=1.0",
+    "edf-neon-core~=2.0",
     "pyzipper~=0.3",
 ]
 
