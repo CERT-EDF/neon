@@ -1,5 +1,6 @@
 import { inject, Injectable } from '@angular/core';
 import { Router } from '@angular/router';
+import { Title } from '@angular/platform-browser';
 import { MessageService } from 'primeng/api';
 import { version } from '../../../public/version';
 import { CaseMetadata } from '../types/case';
@@ -14,6 +15,7 @@ const CASES = 'NEON_CASES';
 export class UtilsService {
   messageService = inject(MessageService);
   private router = inject(Router);
+  private title = inject(Title);
   private bannerText: string = '';
   readonly frontendVersion: string = version;
   isDarkMode = false;
@@ -95,5 +97,9 @@ export class UtilsService {
       storedGuids.push(guid);
       localStorage.setItem(CASES, JSON.stringify(storedGuids));
     }
+  }
+
+  setTitle(title: string) {
+    this.title.setTitle(title);
   }
 }

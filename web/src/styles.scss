@@ -114,10 +114,13 @@ html {
 }
 
 .md {
+  white-space: normal;
+
   * {
     margin: revert;
     padding: revert;
     list-style: revert;
+    max-width: 100%;
   }
 
   h1 {

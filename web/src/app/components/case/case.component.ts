@@ -246,6 +246,8 @@ export class CaseComponent implements OnDestroy {
             error: (error) => console.error('SSE error:', error),
           });
 
+          this.utilsService.setTitle(`Neon - ${data.name}`);
+
           this.apiService
             .getCaseSamples(this.caseMeta.guid)
             .pipe(take(1))
