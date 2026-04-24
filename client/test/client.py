@@ -3,6 +3,7 @@
 
 from argparse import ArgumentParser
 from asyncio import run, sleep
+from dataclasses import dataclass
 from pathlib import Path
 
 from edf_fusion.client import (
@@ -16,8 +17,9 @@ from edf_fusion.client import (
     create_session,
 )
 from edf_fusion.helper.logging import get_logger
+from edf_fusion.helper.serializing import Loadable
 from edf_neon_core.concept import Case, Constant, Sample
-from yarl import URL
+
 
 from edf_neon_client import NeonClient
 
@@ -41,10 +43,12 @@ async def _test_retrieve_constant(fusion_client: FusionClient):
     _LOGGER.info("retrieved constant: %s", constant)
 
 
-async def _test_case_lifecycle(fusion_case_api_client: FusionCaseAPIClient):
+async def _test_case_lifecycle(
+    fusion_case_api_client: FusionCaseAPIClient, acs: set[str]
+):
     # create case
     case = await fusion_case_api_client.create_case(
-        Case(tsid=None, name='T', description='D', acs={'test'})
+        Case(tsid=None, name='T', description='D', acs=acs)
     )
     _LOGGER.info("created case: %s", case)
     # update case
@@ -146,7 +150,7 @@ async def _test_analyzers(
         _LOGGER.info("downloaded analysis data: %s", output)
 
 
-async def _playbook(fusion_client: FusionClient):
+async def _playbook(fusion_client: FusionClient, acs: set[str]):
     fusion_case_api_client = FusionCaseAPIClient(
         case_cls=Case, fusion_client=fusion_client
     )
@@ -156,9 +160,9 @@ async def _playbook(fusion_client: FusionClient):
     neon_client = NeonClient(fusion_client=fusion_client)
     await _test_retrieve_info(fusion_client)
     await _test_retrieve_constant(fusion_client)
-    await _test_case_lifecycle(fusion_case_api_client)
+    await _test_case_lifecycle(fusion_case_api_client, acs)
     case = await fusion_case_api_client.create_case(
-        Case(tsid=None, name='T', description='D', acs={'test'})
+        Case(tsid=None, name='T', description='D', acs=acs)
     )
     _LOGGER.info("created case: %s", case)
     input("execution paused, press enter to continue!")
@@ -175,35 +179,46 @@ async def _playbook(fusion_client: FusionClient):
     await fusion_case_api_client.delete_case(case.guid)
 
 
+@dataclass(kw_only=True)
+class TestConfig(Loadable):
+    """Test configuration"""
+
+    url: str
+    key: str
+
+    @classmethod
+    def from_dict(cls, dct):
+        return cls(url=dct['url'], key=dct['key'])
+
+
 def _parse_args():
     parser = ArgumentParser()
-    parser.add_argument(
-        '--api-url',
-        type=URL,
-        default=URL('http://neon.domain.lan/'),
-        help="API URL",
-    )
-    return parser.parse_args()
+    parser.add_argument('config', type=Path, help="Test configuration")
+    args = parser.parse_args()
+    args.config = TestConfig.from_filepath(args.config)
+    return args
 
 
 async def app():
     """Application entrypoint"""
     args = _parse_args()
-    config = FusionClientConfig(api_url=args.api_url)
+    config = FusionClientConfig(
+        api_url=args.config.url, api_key=args.config.key
+    )
     session = create_session(config, unsafe=True)
     async with session:
         fusion_client = FusionClient(config=config, session=session)
         fusion_auth_api_client = FusionAuthAPIClient(
             fusion_client=fusion_client
         )
-        identity = await fusion_auth_api_client.login('test', 'test')
+        identity = await fusion_auth_api_client.is_logged()
         if not identity:
             return
         _LOGGER.info("logged as: %s", identity)
         try:
-            await _playbook(fusion_client)
-        finally:
-            await fusion_auth_api_client.logout()
+            await _playbook(fusion_client, {identity.username})
+        except:
+            _LOGGER.exception("exception raised!")
 
 
 if __name__ == '__main__':

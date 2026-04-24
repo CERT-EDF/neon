@@ -13,7 +13,7 @@ from uuid import UUID
 from edf_fusion.concept import AnalyzerInfo
 from edf_fusion.helper.filesystem import GUID_GLOB, iter_guid_items
 from edf_fusion.helper.logging import get_logger
-from edf_fusion.helper.redis import Redis, create_redis_lock
+from edf_fusion.helper.redis import create_redis_lock
 from edf_fusion.helper.streaming import stream_from_fobj
 from edf_fusion.helper.zip import create_zip
 from edf_fusion.server.storage import ConceptStorage, FusionStorage
@@ -125,7 +125,6 @@ class CaseStorage(ConceptStorage):
 class Storage(FusionStorage):
     """Neon Storage"""
 
-    redis: Redis | None
     config: NeonStorageConfig
 
     @cached_property
@@ -259,9 +258,6 @@ class Storage(FusionStorage):
         self, case_guid: UUID, name: str, fobj: BufferedIOBase
     ) -> Sample | None:
         """Create case sample"""
-        if not self.redis:
-            _LOGGER.error("cannot create sample without a redis instance!")
-            return None
         loop = get_running_loop()
         _LOGGER.info("sample autopsy for '%s' in %s", name, case_guid)
         sample = await loop.run_in_executor(None, _autopsy, name, fobj)
@@ -284,10 +280,7 @@ class Storage(FusionStorage):
     async def update_sample(
         self, case_guid: UUID, sample_guid: UUID, dct
     ) -> Sample | None:
-        """Update case sample (MUTEX)"""
-        if not self.redis:
-            _LOGGER.error("cannot update sample without a redis instance!")
-            return None
+        """Update case sample"""
         sample_storage = self.sample_storage(case_guid, sample_guid)
         metadata = sample_storage.metadata
         lock_name = f'sample-meta-lock-{sample_guid}'

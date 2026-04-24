@@ -19,7 +19,7 @@ class CaseHit(Concept):
     def from_dict(cls, dct):
         return cls(
             case=Case.from_dict(dct['case']),
-            sample=Case.from_dict(dct['sample']),
+            sample=Sample.from_dict(dct['sample']),
         )
 
     def to_dict(self):

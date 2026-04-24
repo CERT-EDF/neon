@@ -8,8 +8,17 @@ from edf_fusion.concept import Identity, Info
 from edf_fusion.helper.config import ConfigError
 from edf_fusion.helper.logging import get_logger
 from edf_fusion.helper.redis import setup_redis
-from edf_fusion.server.auth import FusionAuthAPI, get_fusion_auth_api
-from edf_fusion.server.case import FusionCaseAPI
+from edf_fusion.server.auth import (
+    Access,
+    Action,
+    FusionAuthAPI,
+    get_fusion_auth_api,
+)
+from edf_fusion.server.case import (
+    ActionDeleteCase,
+    ActionUpdateCase,
+    FusionCaseAPI,
+)
 from edf_fusion.server.constant import FusionConstantAPI
 from edf_fusion.server.download import FusionDownloadAPI
 from edf_fusion.server.event import FusionEventAPI
@@ -34,11 +43,11 @@ _LOGGER = get_logger('server.main', root='neon')
 
 
 async def _authorize_impl(
-    identity: Identity, request: Request, context: dict
+    request: Request, action: Action, identity: Identity
 ) -> bool:
     """Authorize implementation"""
     storage = get_fusion_storage(request)
-    case_guid = context.get('case_guid')
+    case_guid = action.context.get('case_guid')
     if not case_guid:
         return True
     case = await storage.retrieve_case(case_guid)
@@ -46,14 +55,18 @@ async def _authorize_impl(
         _LOGGER.warning("case not found!")
         return False
     fusion_auth_api = get_fusion_auth_api(request)
-    can_access = fusion_auth_api.can_access_case(identity, case)
-    if not can_access:
+    access = fusion_auth_api.can_access_case(identity, case)
+    if not access or (action.change and access != Access.CHANGE):
         return False
-    case_open_check = context.get('case_open_check')
-    if case_open_check and case.closed:
+    if action.change and case.closed:
+        if isinstance(action, (ActionDeleteCase, ActionUpdateCase)):
+            # allow closed case deletion
+            # allow closed case update to reopen case
+            # (Case.update will prevent closed case modification if not reopen)
+            return True
         _LOGGER.warning("case closed!")
         return False
-    return can_access
+    return True
 
 
 def _parse_args() -> Namespace:

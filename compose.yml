@@ -39,7 +39,8 @@ services:
       - neon-redis
     environment:
       ROLE: server
-      FUSION_DEBUG: 0
+      COLUMNS: ${COLUMNS:-120}
+      FUSION_DEBUG: ${FUSION_DEBUG:-0}
 
   neon-synchronizer:
     build:
@@ -52,7 +53,8 @@ services:
       - /data/neon/data:/data
     environment:
       ROLE: synchronizer
-      FUSION_DEBUG: 0
+      COLUMNS: ${COLUMNS:-120}
+      FUSION_DEBUG: ${FUSION_DEBUG:-0}
 
   neon-analyzer-capa:
     build:
@@ -70,7 +72,8 @@ services:
       - neon-redis
     environment:
       ROLE: analyzer
-      FUSION_DEBUG: 0
+      COLUMNS: ${COLUMNS:-120}
+      FUSION_DEBUG: ${FUSION_DEBUG:-0}
 
   neon-analyzer-ct:
     build:
@@ -87,7 +90,8 @@ services:
       - neon-redis
     environment:
       ROLE: analyzer
-      FUSION_DEBUG: 0
+      COLUMNS: ${COLUMNS:-120}
+      FUSION_DEBUG: ${FUSION_DEBUG:-0}
 
   neon-analyzer-die:
     build:
@@ -104,7 +108,8 @@ services:
       - neon-redis
     environment:
       ROLE: analyzer
-      FUSION_DEBUG: 0
+      COLUMNS: ${COLUMNS:-120}
+      FUSION_DEBUG: ${FUSION_DEBUG:-0}
 
   neon-analyzer-floss:
     build:
@@ -121,7 +126,8 @@ services:
       - neon-redis
     environment:
       ROLE: analyzer
-      FUSION_DEBUG: 0
+      COLUMNS: ${COLUMNS:-120}
+      FUSION_DEBUG: ${FUSION_DEBUG:-0}
 
   neon-analyzer-yara:
     build:
@@ -139,7 +145,8 @@ services:
       - neon-redis
     environment:
       ROLE: analyzer
-      FUSION_DEBUG: 0
+      COLUMNS: ${COLUMNS:-120}
+      FUSION_DEBUG: ${FUSION_DEBUG:-0}
 
 networks:
   private:
