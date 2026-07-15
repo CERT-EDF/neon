@@ -51,11 +51,12 @@ root = ".."
 version_file = "edf_neon_server/__version__.py"
 
 
-[tool.black]
+[tool.ruff]
+include = ["pyproject.toml", "edf_neon_server/**/*.py"]
+exclude = ["edf_neon_server/__version__.py"]
 line-length = 79
-skip-string-normalization = true
 
 
-[tool.isort]
-profile = "black"
-line_length = 79
+[tool.ruff.format]
+quote-style = "preserve"
+
