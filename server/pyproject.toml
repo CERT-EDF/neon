@@ -37,7 +37,7 @@ neon-synchronizer = "edf_neon_server.synchronizer:app"
 
 
 [build-system]
-requires = ["setuptools>=78", "setuptools_scm>=8.2", "wheel"]
+requires = ["setuptools>=83", "setuptools_scm>=10", "wheel"]
 build-backend = "setuptools.build_meta"
 
 
